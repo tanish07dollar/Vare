@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VARE — Voice Authenticity Risk Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #080c10;
+    --surface:  #0d1318;
+    --border:   #1a2530;
+    --border2:  #243040;
+    --text:     #c8d8e8;
+    --muted:    #4a6070;
+    --accent:   #00d4ff;
+    --low:      #22c55e;
+    --medium:   #f59e0b;
+    --high:     #ef4444;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,212,255,0.015) 2px,
+      rgba(0,212,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 120px;
+    height: 1px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    position: relative;
+  }
+
+  .logo-mark::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(0,212,255,0.3);
+  }
+
+  .header-title { font-family: var(--mono); font-size: 13px; letter-spacing: 0.15em; color: var(--accent); }
+  .header-sub   { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; margin-top: 2px; }
+
+  .header-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--low);
+    box-shadow: 0 0 6px var(--low);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Layout ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+    display: grid;
+    gap: 24px;
+  }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    padding: 48px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    background: var(--surface);
+  }
+
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.03);
+  }
+
+  .upload-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 16px;
+    border: 1.5px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    font-size: 20px;
+  }
+
+  .upload-title { font-family: var(--mono); font-size: 13px; color: var(--text); margin-bottom: 6px; letter-spacing: 0.08em; }
+  .upload-sub   { font-size: 12px; color: var(--muted); }
+
+  .upload-btn {
+    margin-top: 20px;
+    display: inline-block;
+    padding: 10px 28px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .upload-btn:hover { background: var(--accent); color: var(--bg); }
+
+  .file-selected {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Analyze button ── */
+  #analyze-btn {
+    width: 100%;
+    padding: 16px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    display: none;
+  }
+
+  #analyze-btn.visible { display: block; }
+
+  #analyze-btn::before {
+    content: '';
+    position: absolute;
+    left: -100%;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.1), transparent);
+    transition: left 0.4s;
+  }
+
+  #analyze-btn:hover::before { left: 100%; }
+  #analyze-btn:hover { background: rgba(0,212,255,0.08); box-shadow: 0 0 20px rgba(0,212,255,0.15); }
+  #analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Loading ── */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 32px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .loading-bar {
+    width: 200px;
+    height: 2px;
+    background: var(--border);
+    margin: 16px auto 0;
+    overflow: hidden;
+  }
+
+  .loading-bar::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: 40%;
+    background: var(--accent);
+    animation: slide 1.2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  @keyframes slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
+
+  /* ── Results ── */
+  #results { display: none; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+
+  /* ── Section label ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Verdict banner ── */
+  .verdict-banner {
+    border: 1.5px solid var(--border2);
+    background: var(--surface);
+    padding: 28px 32px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .verdict-score {
+    font-family: var(--mono);
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+    transition: color 0.4s;
+  }
+
+  .verdict-score span {
+    font-size: 18px;
+    color: var(--muted);
+    vertical-align: super;
+  }
+
+  .verdict-info { }
+  .verdict-level {
+    font-family: var(--mono);
+    font-size: 22px;
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
+  }
+
+  .verdict-detail {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── Gauge ── */
+  .gauge-wrap {
+    width: 120px;
+    text-align: center;
+  }
+
+  .gauge-wrap svg { overflow: visible; }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat-box {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 16px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--text);
+  }
+
+  .stat-unit { font-size: 12px; color: var(--muted); }
+
+  /* ── Model cards ── */
+  .models-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .model-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .model-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .model-card.unavailable { opacity: 0.4; }
+  .model-card.unavailable::before { background: var(--muted); }
+
+  .model-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .model-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  .model-score-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  .model-score-value {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .prob-bar-wrap {
+    height: 3px;
+    background: var(--border);
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .prob-bar {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+
+  .prob-bar::after {
+    content: '';
+    position: absolute;
+    right: 0; top: -3px;
+    width: 1px; height: 9px;
+    background: var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+  }
+
+  /* ── Segment chart ── */
+  .segment-section {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px;
+  }
+
+  .segment-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 80px;
+    margin-top: 12px;
+  }
+
+  .seg-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .seg-bar {
+    width: 100%;
+    min-height: 2px;
+    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+
+  .seg-bar:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 7px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .seg-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── Error ── */
+  #error-box {
+    display: none;
+    border: 1px solid var(--high);
+    background: rgba(239,68,68,0.05);
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--high);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 40px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">VA</div>
+  <div>
+    <div class="header-title">VARE</div>
+    <div class="header-sub">VOICE AUTHENTICITY RISK ENGINE</div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot"></div>
+    <span id="status-text">SYSTEM READY</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Upload -->
+  <div>
+    <div class="section-label">AUDIO INPUT</div>
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".wav,.mp3,.flac,.m4a,.ogg"/>
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        </svg>
+      </div>
+      <div class="upload-title">DROP AUDIO FILE HERE</div>
+      <div class="upload-sub">WAV · MP3 · FLAC · M4A · OGG</div>
+      <button class="upload-btn" onclick="document.getElementById('file-input').click(); event.stopPropagation()">BROWSE FILES</button>
+      <div class="file-selected" id="file-name"></div>
+    </div>
+  </div>
+
+  <!-- Analyze -->
+  <button id="analyze-btn" onclick="runAnalysis()">▶ RUN VOICE ANALYSIS</button>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div id="loading-text">INITIALISING MODELS</div>
+    <div class="loading-bar"></div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box"></div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Verdict -->
+    <div class="section-label">RISK ASSESSMENT</div>
+    <div class="verdict-banner">
+      <div class="verdict-score" id="v-score">--<span>/100</span></div>
+      <div class="verdict-info">
+        <div class="verdict-level" id="v-level">--</div>
+        <div class="verdict-detail" id="v-detail"></div>
+      </div>
+      <div class="gauge-wrap">
+        <svg width="120" height="70" viewBox="0 0 120 70">
+          <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#1a2530" stroke-width="8" stroke-linecap="round"/>
+          <path id="gauge-arc" d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#00d4ff" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="157" stroke-dashoffset="157"/>
+          <text id="gauge-pct" x="60" y="58" text-anchor="middle" font-family="Space Mono" font-size="14" fill="#c8d8e8">0%</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" style="margin-top:12px">
+      <div class="stat-box">
+        <div class="stat-label">DURATION</div>
+        <div class="stat-value" id="s-dur">--<span class="stat-unit"> s</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">SEGMENTS ANALYSED</div>
+        <div class="stat-value" id="s-seg">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">MODEL AGREEMENT</div>
+        <div class="stat-value" id="s-conf">--<span class="stat-unit">%</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">MODELS ACTIVE</div>
+        <div class="stat-value" id="s-mods">--<span class="stat-unit">/3</span></div>
+      </div>
+    </div>
+
+    <!-- Model breakdown -->
+    <div style="margin-top:24px">
+      <div class="section-label">MODEL BREAKDOWN</div>
+      <div class="models-grid">
+
+        <div class="model-card" id="card-aasist3">
+          <div class="model-name">AASIST3</div>
+          <div class="model-desc">Graph attention · spectro-temporal · KAN layers</div>
+          <div class="model-score-label">SPOOF PROBABILITY</div>
+          <div class="model-score-value" id="aasist3-score">--</div>
+          <div class="prob-bar-wrap"><div class="prob-bar" id="aasist3-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="model-card" id="card-wav2vec2">
+          <div class="model-name">WAV2VEC 2.0</div>
+          <div class="model-desc">SSL transformer · contrastive pretraining · XLSR</div>
+          <div class="model-score-label">SPOOF PROBABILITY</div>
+          <div class="model-score-value" id="wav2vec2-score">--</div>
+          <div class="prob-bar-wrap"><div class="prob-bar" id="wav2vec2-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="model-card" id="card-rawnet2">
+          <div class="model-name">RAWNET2</div>
+          <div class="model-desc">SincConv · residual blocks · FMS · GRU</div>
+          <div class="model-score-label">SPOOF PROBABILITY</div>
+          <div class="model-score-value" id="rawnet2-score">--</div>
+          <div class="prob-bar-wrap"><div class="prob-bar" id="rawnet2-bar" style="width:0%"></div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Segment chart -->
+    <div style="margin-top:24px">
+      <div class="section-label">SEGMENT ANALYSIS</div>
+      <div class="segment-section">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">
+          Spoof probability per 4-second window — each bar is one segment of the audio
+        </div>
+        <div class="segment-chart" id="seg-chart"></div>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+
+</main>
+
+<footer>
+  <span>VARE · VOICE AUTHENTICITY RISK ENGINE</span>
+  <span id="footer-device">--</span>
+</footer>
+
+<script>
+  // ── File selection ──────────────────────────────
+  const fileInput  = document.getElementById('file-input');
+  const dropZone   = document.getElementById('drop-zone');
+  const fileNameEl = document.getElementById('file-name');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  let selectedFile = null;
+
+  fileInput.addEventListener('change', e => selectFile(e.target.files[0]));
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+  });
+
+  function selectFile(f) {
+    selectedFile = f;
+    fileNameEl.textContent = '▸ ' + f.name + '  (' + (f.size / 1024).toFixed(1) + ' KB)';
+    analyzeBtn.classList.add('visible');
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('error-box').style.display = 'none';
+  }
+
+  // ── Health check on load ────────────────────────
+  fetch('/health').then(r => r.json()).then(d => {
+    document.getElementById('footer-device').textContent = 'DEVICE: ' + d.device.toUpperCase();
+    const active = Object.values(d.models_loaded).filter(Boolean).length;
+    document.getElementById('status-text').textContent = active + '/3 MODELS READY';
+  }).catch(() => {});
+
+  // ── Analysis ────────────────────────────────────
+  async function runAnalysis() {
+    if (!selectedFile) return;
+
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const errBox  = document.getElementById('error-box');
+
+    analyzeBtn.disabled = true;
+    results.style.display = 'none';
+    errBox.style.display  = 'none';
+    loading.style.display = 'block';
+
+    const steps = [
+      'LOADING AUDIO FILE',
+      'PREPROCESSING SEGMENTS',
+      'RUNNING AASIST3',
+      'RUNNING WAV2VEC2',
+      'RUNNING RAWNET2',
+      'AGGREGATING ENSEMBLE'
+    ];
+    let si = 0;
+    const stepTimer = setInterval(() => {
+      document.getElementById('loading-text').textContent = steps[si % steps.length];
+      si++;
+    }, 1800);
+
+    try {
+      const form = new FormData();
+      form.append('file', selectedFile);
+
+      const res  = await fetch('/analyze', { method: 'POST', body: form });
+      const data = await res.json();
+
+      clearInterval(stepTimer);
+      loading.style.display = 'none';
+      analyzeBtn.disabled = false;
+
+      if (data.status === 'error') {
+        errBox.textContent = '⚠ ERROR: ' + data.message;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      renderResults(data);
+
+    } catch(e) {
+      clearInterval(stepTimer);
+      loading.style.display = 'none';
+      analyzeBtn.disabled = false;
+      errBox.textContent = '⚠ REQUEST FAILED: ' + e.message;
+      errBox.style.display = 'block';
+    }
+  }
+
+  // ── Render ──────────────────────────────────────
+  function scoreColor(score) {
+    if (score <= 30) return '#22c55e';
+    if (score <= 60) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  function renderResults(d) {
+    const results = document.getElementById('results');
+    results.style.display = 'block';
+
+    // Verdict
+    const sc = d.ensemble_score;
+    const col = scoreColor(sc);
+
+    const scoreEl = document.getElementById('v-score');
+    scoreEl.innerHTML = sc + '<span>/100</span>';
+    scoreEl.style.color = col;
+
+    document.getElementById('v-level').textContent = d.risk_level + ' RISK';
+    document.getElementById('v-level').style.color = col;
+
+    const descriptions = {
+      LOW:    'Voice patterns consistent with genuine human speech. No significant synthetic artifacts detected.',
+      MEDIUM: 'Some anomalous patterns detected. Manual review recommended before proceeding.',
+      HIGH:   'Strong indicators of synthetic, cloned, or AI-generated voice. High probability of fraud attempt.'
+    };
+    document.getElementById('v-detail').textContent = descriptions[d.risk_level];
+
+    // Gauge arc
+    const arc = document.getElementById('gauge-arc');
+    const pct = sc / 100;
+    const dashOffset = 157 - (157 * pct);
+    arc.style.strokeDashoffset = dashOffset;
+    arc.style.stroke = col;
+    document.getElementById('gauge-pct').textContent = sc + '%';
+
+    // Stats
+    document.getElementById('s-dur').innerHTML  = d.duration_sec + '<span class="stat-unit"> s</span>';
+    document.getElementById('s-seg').textContent = d.n_segments;
+    document.getElementById('s-conf').innerHTML  = Math.round(d.model_confidence * 100) + '<span class="stat-unit">%</span>';
+
+    const active = Object.values(d.models).filter(m => m.available).length;
+    document.getElementById('s-mods').innerHTML = active + '<span class="stat-unit">/3</span>';
+
+    // Model cards
+    renderModel('aasist3', d.models.aasist3);
+    renderModel('wav2vec2', d.models.wav2vec2);
+    renderModel('rawnet2',  d.models.rawnet2);
+
+    // Segment chart — use AASIST3 segments as primary, fallback to wav2vec2
+    const segs = d.models.aasist3.segment_scores.length
+      ? d.models.aasist3.segment_scores
+      : d.models.wav2vec2.segment_scores;
+    renderSegments(segs);
+  }
+
+  function renderModel(key, m) {
+    const card      = document.getElementById('card-' + key);
+    const scoreEl   = document.getElementById(key + '-score');
+    const barEl     = document.getElementById(key + '-bar');
+
+    if (!m.available) {
+      card.classList.add('unavailable');
+      scoreEl.textContent = 'N/A';
+      return;
+    }
+
+    card.classList.remove('unavailable');
+    const sc  = m.aggregate_spoof_prob;
+    const col = scoreColor(sc);
+    scoreEl.textContent = sc + '%';
+    scoreEl.style.color = col;
+    barEl.style.width   = sc + '%';
+    barEl.style.background = col;
+    barEl.style.boxShadow  = '0 0 6px ' + col;
+  }
+
+  function renderSegments(segs) {
+    const chart = document.getElementById('seg-chart');
+    chart.innerHTML = '';
+    if (!segs || segs.length === 0) {
+      chart.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">No segment data</span>';
+      return;
+    }
+    segs.forEach((s, i) => {
+      const col = scoreColor(s);
+      const heightPct = Math.max(s, 2);
+      const wrap = document.createElement('div');
+      wrap.className = 'seg-bar-wrap';
+
+      const bar = document.createElement('div');
+      bar.className  = 'seg-bar';
+      bar.style.height     = heightPct + '%';
+      bar.style.background = col;
+      bar.style.boxShadow  = '0 0 4px ' + col;
+      bar.setAttribute('data-tip', 'Seg ' + (i+1) + ': ' + s + '%');
+
+      const lbl = document.createElement('div');
+      lbl.className   = 'seg-label';
+      lbl.textContent = (i+1);
+
+      wrap.appendChild(bar);
+      wrap.appendChild(lbl);
+      chart.appendChild(wrap);
+    });
+  }
+</script>
+</body>
+</html>

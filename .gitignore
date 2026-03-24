@@ -1,0 +1,48 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+aasist_env/
+venv/
+.venv/
+env/
+
+# ── Model weights & checkpoints (too large for GitHub) ─────────────────────────
+finetune/checkpoints/
+models/aasist3/weights/
+models/aasist_reference/models/weights/
+models/aasist_reference/pretrained/
+weights/
+
+# ── Training & evaluation data (too large for GitHub) ─────────────────────────
+finetune/data/
+finetune/LibriSpeech/
+finetune/librispeech_dev.tar.gz
+finetune/for2sec.zip
+*.tar.gz
+*.zip
+
+# ── Logs (regenerated on each run) ────────────────────────────────────────────
+finetune/logs/
+
+# ── HuggingFace cache ─────────────────────────────────────────────────────────
+.cache/
+*.locks/
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+.env
+*.env
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
