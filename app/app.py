@@ -32,8 +32,19 @@ def load_aasist3():
         sys.path.insert(0, str(Path(__file__).parent.parent / "models/aasist3"))
         from model import aasist3
         m = aasist3.from_pretrained("MTUCI/AASIST3")
+
+        # Load fine-tuned weights on top if available
+        ckpt_path = Path(__file__).parent.parent / "finetune/checkpoints/aasist3_finetuned.pth"
+        if ckpt_path.exists():
+            ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+            state = ckpt["model_state"] if isinstance(ckpt, dict) and "model_state" in ckpt else ckpt
+            m.load_state_dict(state, strict=True)
+            val_acc = ckpt.get("val_acc", "?") if isinstance(ckpt, dict) else "?"
+            print(f"[VARE] AASIST3 loaded (fine-tuned, val_acc={val_acc})")
+        else:
+            print("[VARE] AASIST3 loaded (pretrained only)")
+
         m.eval().to(device)
-        print("[VARE] AASIST3 loaded")
         return m
     except Exception as e:
         print(f"[VARE] AASIST3 failed to load: {e}")
