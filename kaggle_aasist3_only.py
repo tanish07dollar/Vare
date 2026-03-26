@@ -246,18 +246,29 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
 # ── Load AASIST3 model code from VARE ──
-vare_dir = "/kaggle/working/VARE"
-aasist3_dir = f"{vare_dir}/models/aasist3"
+import importlib.util, types
 
-stale = [k for k in sys.modules if k == "model" or k.startswith("model.")]
-for k in stale:
-    del sys.modules[k]
+vare_dir    = "/kaggle/working/VARE"
+model_dir   = Path(f"{vare_dir}/models/aasist3/model")
 
-if aasist3_dir not in sys.path:
-    sys.path.insert(0, aasist3_dir)
+# Clear any stale 'model' entries from previous imports
+for k in list(sys.modules):
+    if k == "model" or k.startswith("model."):
+        del sys.modules[k]
 
-from model import aasist3
-print("AASIST3 model code loaded.")
+# Manually register the 'model' package by absolute path
+# (sys.path tricks are unreliable in Kaggle for nested packages)
+spec = importlib.util.spec_from_file_location(
+    "model",
+    str(model_dir / "__init__.py"),
+    submodule_search_locations=[str(model_dir)]
+)
+model_pkg = importlib.util.module_from_spec(spec)
+sys.modules["model"] = model_pkg
+spec.loader.exec_module(model_pkg)
+
+aasist3 = model_pkg.aasist3
+print(f"AASIST3 model code loaded from: {model_dir}")
 
 # ── Dataset ──
 def read_manifest(split):
