@@ -5,7 +5,7 @@ import json
 import tempfile
 import traceback
 from pathlib import Path
-
+import string
 import torch
 import torchaudio
 import numpy as np
@@ -42,13 +42,8 @@ def load_aasist3():
 def load_wav2vec():
     try:
         from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
-        finetuned_path = Path(__file__).parent.parent / "finetune/checkpoints/wav2vec2_finetuned_full"
-        if finetuned_path.exists():
-            repo = str(finetuned_path)
-            print("[VARE] Loading fine-tuned wav2vec2...")
-        else:
-            repo = "Gustking/wav2vec2-large-xlsr-deepfake-audio-classification"
-            print("[VARE] Loading pretrained wav2vec2...")
+        repo = "Gustking/wav2vec2-large-xlsr-deepfake-audio-classification"
+        print("[VARE] Loading pretrained wav2vec2 (deepfake-trained)...")
         fe = AutoFeatureExtractor.from_pretrained(repo)
         m  = AutoModelForAudioClassification.from_pretrained(repo)
         m.eval().to(device)
@@ -64,7 +59,6 @@ def load_rawnet2():
         from models.RawNet2Spoof import Model
 
         ckpt_path = Path(__file__).parent.parent / "finetune/checkpoints/rawnet2_trained_best.pth"
-        ckpt = torch.load(ckpt_path, map_location=device)
 
         # Must deepcopy — RawNet2Spoof mutates the config dict during __init__
         correct_config = {
@@ -79,9 +73,16 @@ def load_rawnet2():
             "nb_classes":   2
         }
         m = Model(copy.deepcopy(correct_config))
-        m.load_state_dict(ckpt["model_state"], strict=True)
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+
+        # Reference weights are a raw state dict; our fine-tuned ones use a wrapper
+        if isinstance(ckpt, dict) and "model_state" in ckpt:
+            m.load_state_dict(ckpt["model_state"], strict=True)
+        else:
+            m.load_state_dict(ckpt, strict=True)
+
         m.eval().to(device)
-        print(f"[VARE] RawNet2 loaded (trained, val_acc={ckpt.get('val_acc', '?')})")
+        print("[VARE] RawNet2 loaded (ASVspoof pretrained)")
         return m
     except Exception as e:
         print(f"[VARE] RawNet2 failed to load: {e}")
@@ -230,18 +231,21 @@ async def analyze(file: UploadFile = File(...)):
                     "available":            a3_scores is not None,
                     "error":                a3_err,
                     "aggregate_spoof_prob": round(a3_agg * 100, 1) if a3_agg is not None else None,
+                    "verdict":              ("AI Generated" if a3_agg >= 0.5 else "Genuine") if a3_agg is not None else None,
                     "segment_scores":       [round(s * 100, 1) for s in a3_scores] if a3_scores else []
                 },
                 "wav2vec2": {
                     "available":            w2_scores is not None,
                     "error":                w2_err,
                     "aggregate_spoof_prob": round(w2_agg * 100, 1) if w2_agg is not None else None,
+                    "verdict":              ("AI Generated" if w2_agg >= 0.5 else "Genuine") if w2_agg is not None else None,
                     "segment_scores":       [round(s * 100, 1) for s in w2_scores] if w2_scores else []
                 },
                 "rawnet2": {
                     "available":            rn_scores is not None,
                     "error":                rn_err,
                     "aggregate_spoof_prob": round(rn_agg * 100, 1) if rn_agg is not None else None,
+                    "verdict":              ("AI Generated" if rn_agg >= 0.5 else "Genuine") if rn_agg is not None else None,
                     "segment_scores":       [round(s * 100, 1) for s in rn_scores] if rn_scores else []
                 }
             }
@@ -267,4 +271,4 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("app:app", host="127.0.0.1", port=8001, reload=False)

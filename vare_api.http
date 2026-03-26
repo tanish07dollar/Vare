@@ -1,0 +1,128 @@
+# VARE — Voice Authenticity Risk Engine
+# REST Client file — works in VS Code with "REST Client" extension (humao.rest-client)
+# Install: Extensions → search "REST Client" → Install
+# Usage: Click "Send Request" above any request block
+
+@baseUrl = http://127.0.0.1:8001
+
+# ─────────────────────────────────────────────
+# 1. Health Check
+# ─────────────────────────────────────────────
+
+### Health Check
+GET {{baseUrl}}/health
+
+# Expected Response:
+# HTTP/1.1 200 OK
+# Content-Type: application/json
+#
+# {
+#   "device": "cpu",
+#   "models_loaded": {
+#     "aasist3": true,
+#     "wav2vec2": true,
+#     "rawnet2": false
+#   }
+# }
+
+
+# ─────────────────────────────────────────────
+# 2. Analyze Audio File
+# Replace the file path below with your audio file
+# Supported: .wav .mp3 .flac .ogg .m4a .webm
+# ─────────────────────────────────────────────
+
+### Analyze Audio
+POST {{baseUrl}}/analyze
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="audio.wav"
+Content-Type: audio/wav
+
+< C:/Users/User/Downloads/audio.wav
+--boundary--
+
+# Expected Response (AI Generated example):
+# HTTP/1.1 200 OK
+# Content-Type: application/json
+#
+# {
+#   "status": "ok",
+#   "filename": "audio.wav",
+#   "duration_sec": 8.2,
+#   "n_segments": 2,
+#   "ensemble_score": 73.4,
+#   "risk_level": "HIGH",
+#   "risk_color": "#ef4444",
+#   "model_confidence": 0.812,
+#   "models": {
+#     "aasist3": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 68.1,
+#       "verdict": "AI Generated",
+#       "segment_scores": [65.2, 71.0]
+#     },
+#     "wav2vec2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 76.5,
+#       "verdict": "AI Generated",
+#       "segment_scores": [74.1, 78.9]
+#     },
+#     "rawnet2": {
+#       "available": false,
+#       "error": "PytorchStreamReader failed reading zip archive",
+#       "aggregate_spoof_prob": null,
+#       "verdict": null,
+#       "segment_scores": []
+#     }
+#   }
+# }
+
+# Expected Response (Genuine example):
+# HTTP/1.1 200 OK
+# Content-Type: application/json
+#
+# {
+#   "status": "ok",
+#   "filename": "audio.wav",
+#   "duration_sec": 5.1,
+#   "n_segments": 1,
+#   "ensemble_score": 18.3,
+#   "risk_level": "LOW",
+#   "risk_color": "#22c55e",
+#   "model_confidence": 0.941,
+#   "models": {
+#     "aasist3": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 21.0,
+#       "verdict": "Genuine",
+#       "segment_scores": [21.0]
+#     },
+#     "wav2vec2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 16.4,
+#       "verdict": "Genuine",
+#       "segment_scores": [16.4]
+#     },
+#     "rawnet2": {
+#       "available": false,
+#       "error": "PytorchStreamReader failed reading zip archive",
+#       "aggregate_spoof_prob": null,
+#       "verdict": null,
+#       "segment_scores": []
+#     }
+#   }
+# }
+
+# ─────────────────────────────────────────────
+# Risk Level Reference
+# ─────────────────────────────────────────────
+# ensemble_score   risk_level   meaning
+# 0  – 30          LOW          Confident real / Genuine
+# 31 – 60          MEDIUM       Suspicious, flag for review
+# 61 – 100         HIGH         Strong AI / synthetic indicators
