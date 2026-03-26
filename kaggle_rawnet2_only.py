@@ -304,10 +304,26 @@ MODEL_CONFIG = {
 }
 
 # ── Load RawNet2 model ──
-vare_dir = "/kaggle/working/VARE"
-matches  = list(Path(vare_dir).rglob("RawNet2Spoof.py"))
+vare_dir   = "/kaggle/working/VARE"
+aasist_dir = "/kaggle/working/aasist_ref"
+
+matches = list(Path(vare_dir).rglob("RawNet2Spoof.py"))
+
 if not matches:
-    raise FileNotFoundError(f"RawNet2Spoof.py not found under {vare_dir}")
+    print("RawNet2Spoof.py not in VARE — cloning AASIST reference repo as fallback...")
+    import subprocess, shutil
+    if os.path.exists(aasist_dir):
+        shutil.rmtree(aasist_dir)
+    subprocess.run(
+        ["git", "clone", "--depth", "1",
+         "https://github.com/clovaai/aasist.git", aasist_dir],
+        check=True
+    )
+    matches = list(Path(aasist_dir).rglob("RawNet2Spoof.py"))
+
+if not matches:
+    raise FileNotFoundError("RawNet2Spoof.py not found in VARE or aasist fallback clone.")
+
 spec = importlib.util.spec_from_file_location("RawNet2Spoof", str(matches[0]))
 mod  = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
