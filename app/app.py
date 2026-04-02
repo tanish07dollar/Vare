@@ -6,13 +6,19 @@ import tempfile
 import traceback
 from pathlib import Path
 import string
+import numpy as np
 import torch
 import torchaudio
-import numpy as np
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
+
+try:
+    import mutagen
+    MUTAGEN_AVAILABLE = True
+except ImportError:
+    MUTAGEN_AVAILABLE = False
 
 # ─────────────────────────────────────────────
 # App setup
@@ -106,11 +112,26 @@ models["rawnet2"]  = load_rawnet2()
 print("[VARE] Model loading complete")
 
 # ─────────────────────────────────────────────
+# AI signature config (metadata analysis)
+# ─────────────────────────────────────────────
+_SIG_PATH = Path(__file__).parent / "ai_signatures.json"
+try:
+    with open(_SIG_PATH, encoding="utf-8") as _f:
+        AI_SIGNATURES = json.load(_f)
+    print(f"[VARE] Loaded AI signatures: {len(AI_SIGNATURES['tag_keywords'])} tag keywords, {len(AI_SIGNATURES['filename_patterns'])} filename patterns")
+except Exception as _e:
+    AI_SIGNATURES = {"tag_keywords": [], "filename_patterns": []}
+    print(f"[VARE] Warning: could not load ai_signatures.json: {_e}")
+
+# ─────────────────────────────────────────────
 # Audio preprocessing
 # ─────────────────────────────────────────────
-TARGET_SR   = 16000
-SEGMENT_LEN = 64600
-SEGMENT_HOP = 48000
+TARGET_SR           = 16000
+SEGMENT_LEN         = 64600
+SEGMENT_HOP         = 48000
+MAX_FILE_SIZE_MB    = 25
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+MAX_DURATION_SEC    = 300   # 5 minutes
 
 def load_and_resample(path: str):
     audio, sr = torchaudio.load(path)
@@ -183,8 +204,8 @@ def run_rawnet2(segments):
 def aggregate(scores):
     if not scores:
         return 0.0
-    weights = [1 + i * 0.1 for i in range(len(scores))]
-    return sum(s * w for s, w in zip(scores, weights)) / sum(weights)
+    mean = sum(scores) / len(scores)
+    return 0.6 * mean + 0.4 * max(scores)
 
 def risk_level(score_0_1):
     s = score_0_1 * 100
@@ -193,21 +214,263 @@ def risk_level(score_0_1):
     return "HIGH", "#ef4444"
 
 # ─────────────────────────────────────────────
+# Metadata analysis
+# ─────────────────────────────────────────────
+def analyze_metadata(file_path: str, original_filename: str) -> dict:
+    """
+    Check embedded audio tags and filename for known AI TTS tool signatures.
+    Returns a metadata_analysis dict. Never raises — falls back to flag_raised=False.
+    Does NOT affect the ensemble score.
+    """
+    no_flag = {"flag_raised": False, "reason": None, "matched_field": None, "matched_value": None}
+
+    tag_keywords      = [k.lower() for k in AI_SIGNATURES.get("tag_keywords", [])]
+    filename_patterns = [p.lower() for p in AI_SIGNATURES.get("filename_patterns", [])]
+
+    # ── 1. File tag inspection via mutagen ──────────────────────────────────
+    if MUTAGEN_AVAILABLE:
+        try:
+            audio_file = mutagen.File(file_path, easy=False)
+            if audio_file is not None:
+                # Build a flat dict of {field_name: string_value} from all tags
+                tag_candidates = {}
+
+                # ID3 (MP3): TIT2, COMM, TENC, TSSE, etc.
+                if hasattr(audio_file, "tags") and audio_file.tags is not None:
+                    for key, val in audio_file.tags.items():
+                        key_str = str(key).lower()
+                        if any(t in key_str for t in ("enc", "soft", "comm", "tsse", "tenc", "isft", "icmt", "ieng")):
+                            tag_candidates[str(key)] = str(val)
+
+                # WAV RIFF INFO chunks (mutagen.wave.WAVE uses _RiffChunk)
+                if hasattr(audio_file, "info") and hasattr(audio_file, "tags"):
+                    # mutagen exposes RIFF chunks via tags for WAV
+                    pass  # already covered by tags loop above
+
+                # FLAC / OGG Vorbis comments — mutagen stores as dict-like
+                if hasattr(audio_file, "get"):
+                    for vkey in ("encoder", "encoded-by", "comment", "software", "tool"):
+                        vals = audio_file.get(vkey, [])
+                        if vals:
+                            tag_candidates[vkey] = " ".join(str(v) for v in vals)
+
+                # Check each collected tag value against known keywords
+                for field, value in tag_candidates.items():
+                    value_lower = value.lower()
+                    for keyword in tag_keywords:
+                        if keyword in value_lower:
+                            # Find the original-case keyword for the reason string
+                            orig_kw = AI_SIGNATURES["tag_keywords"][tag_keywords.index(keyword)]
+                            return {
+                                "flag_raised":    True,
+                                "reason":         f"{orig_kw} detected in file tags",
+                                "matched_field":  field,
+                                "matched_value":  value.strip(),
+                            }
+        except Exception:
+            pass  # unreadable tags → fall through to filename check
+
+    # ── 2. Filename pattern check ────────────────────────────────────────────
+    name_lower = original_filename.lower() if original_filename else ""
+    for pattern in filename_patterns:
+        if pattern in name_lower:
+            orig_pat = AI_SIGNATURES["filename_patterns"][filename_patterns.index(pattern)]
+            return {
+                "flag_raised":   True,
+                "reason":        f"AI tool pattern '{orig_pat}' detected in filename",
+                "matched_field": "filename",
+                "matched_value": original_filename,
+            }
+
+    return no_flag
+
+
+# ─────────────────────────────────────────────
 # API endpoints
 # ─────────────────────────────────────────────
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
     try:
+        contents = await file.read()
+
+        if len(contents) > MAX_FILE_SIZE_BYTES:
+            return JSONResponse(
+                {"status": "error", "message": f"File too large ({len(contents) / (1024*1024):.1f} MB). Maximum allowed size is {MAX_FILE_SIZE_MB} MB."},
+                status_code=413
+            )
+
         suffix = Path(file.filename).suffix or ".wav"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(await file.read())
+            tmp.write(contents)
             tmp_path = tmp.name
 
+        meta_result  = analyze_metadata(tmp_path, file.filename)
         audio        = load_and_resample(tmp_path)
         os.unlink(tmp_path)
-        segments     = segment_audio(audio)
-        n_segments   = len(segments)
         duration_sec = round(audio.shape[1] / TARGET_SR, 1)
+
+        if duration_sec > MAX_DURATION_SEC:
+            return JSONResponse(
+                {"status": "error", "message": f"Audio too long ({duration_sec}s). Maximum allowed duration is {MAX_DURATION_SEC // 60} minutes."},
+                status_code=422
+            )
+
+        segments   = segment_audio(audio)
+        n_segments = len(segments)
+
+        # ── Preprocessing visualizations (safe — no model contact) ──────────
+        preprocessing = None
+        try:
+            audio_np     = audio.squeeze().numpy()
+            total_samples = len(audio_np)
+
+            # 1. Downsampled waveform (~2000 points)
+            stride          = max(1, total_samples // 2000)
+            waveform_points = audio_np[::stride][:2000].tolist()
+
+            # 2. Mel spectrogram (80 bands, max 200 time columns)
+            mel_t  = torchaudio.transforms.MelSpectrogram(
+                sample_rate=TARGET_SR, n_mels=80, n_fft=1024, hop_length=512
+            )
+            db_t   = torchaudio.transforms.AmplitudeToDB()
+            mel_np = db_t(mel_t(audio)).squeeze(0).numpy()   # (80, T)
+            t_stride = max(1, mel_np.shape[1] // 200)
+            mel_list = mel_np[:, ::t_stride][:, :200].tolist()
+
+            # 3. MFCC (13 coefficients, max 200 time columns)
+            mfcc_t  = torchaudio.transforms.MFCC(
+                sample_rate=TARGET_SR, n_mfcc=13, melkwargs={"n_mels": 80}
+            )
+            mfcc_np = mfcc_t(audio).squeeze(0).numpy()       # (13, T)
+            t_stride2 = max(1, mfcc_np.shape[1] // 200)
+            mfcc_list = mfcc_np[:, ::t_stride2][:, :200].tolist()
+
+            # 4. Power spectral density (first 500 bins)
+            fft_out    = torch.fft.rfft(audio.squeeze())
+            psd_power  = (torch.abs(fft_out) ** 2)
+            psd_freqs  = torch.fft.rfftfreq(audio.shape[-1], d=1.0 / TARGET_SR)
+            psd_data   = {"freqs": psd_freqs[:500].tolist(), "power": psd_power[:500].tolist()}
+
+            # 5. Segment boundaries
+            seg_boundaries = []
+            for i in range(n_segments):
+                start = i * SEGMENT_HOP
+                end   = min(start + SEGMENT_LEN, total_samples)
+                seg_boundaries.append({
+                    "index":        i,
+                    "start_sample": start,
+                    "end_sample":   end,
+                    "start_sec":    round(start / TARGET_SR, 2),
+                    "end_sec":      round(end   / TARGET_SR, 2),
+                })
+
+            # 6. Audio metadata
+            audio_meta = {
+                "duration_sec":  round(total_samples / TARGET_SR, 2),
+                "sample_rate":   TARGET_SR,
+                "num_segments":  n_segments,
+                "total_samples": total_samples,
+            }
+
+            # 7. MFCC statistics — mean & std per coefficient + delta
+            mfcc_mean        = mfcc_np.mean(axis=1).tolist()    # shape (13,)
+            mfcc_std         = mfcc_np.std(axis=1).tolist()     # shape (13,)
+            mfcc_delta_np    = np.diff(mfcc_np, axis=1)         # (13, T-1)
+            mfcc_delta_mean  = mfcc_delta_np.mean(axis=1).tolist()
+            mfcc_delta_std   = mfcc_delta_np.std(axis=1).tolist()
+            mfcc_analysis = {
+                "mean":       [round(v, 3) for v in mfcc_mean],
+                "std":        [round(v, 3) for v in mfcc_std],
+                "delta_mean": [round(v, 3) for v in mfcc_delta_mean],
+                "delta_std":  [round(v, 3) for v in mfcc_delta_std],
+            }
+
+            # 8. Acoustic artifacts
+            psd_power_np = np.array(psd_data["power"])
+            psd_freqs_np = np.array(psd_data["freqs"])
+
+            # Spectral flatness: geometric mean / arithmetic mean (0=tonal, 1=noise-like)
+            geo_mean  = float(np.exp(np.mean(np.log(psd_power_np + 1e-10))))
+            arith_mean = float(np.mean(psd_power_np))
+            spectral_flatness = round(min(geo_mean / (arith_mean + 1e-10), 1.0), 4)
+
+            # High-frequency energy ratio (energy >4 kHz vs total)
+            hf_mask    = psd_freqs_np >= 4000
+            hf_ratio   = round(float(psd_power_np[hf_mask].sum() /
+                                     (psd_power_np.sum() + 1e-10)), 4)
+
+            # Zero crossing rate per 256-sample frame
+            frame_sz   = 256
+            n_zcr_frames = max(1, total_samples // frame_sz)
+            zcr_rates  = []
+            for fi in range(n_zcr_frames):
+                frame   = audio_np[fi * frame_sz: (fi + 1) * frame_sz]
+                zc      = float(np.sum(np.abs(np.diff(np.sign(frame)))) / 2 / len(frame))
+                zcr_rates.append(zc)
+            zcr_mean = round(float(np.mean(zcr_rates)), 5)
+            zcr_std  = round(float(np.std(zcr_rates)), 5)
+
+            artifact_analysis = {
+                "spectral_flatness": spectral_flatness,
+                "hf_energy_ratio":   hf_ratio,
+                "zcr_mean":          zcr_mean,
+                "zcr_std":           zcr_std,
+            }
+
+            # 9. Prosody analysis — RMS energy envelope + pause detection
+            rms_frame_sz = 512
+            n_rms        = max(1, total_samples // rms_frame_sz)
+            rms_env      = []
+            for fi in range(n_rms):
+                frame   = audio_np[fi * rms_frame_sz: (fi + 1) * rms_frame_sz]
+                rms_env.append(float(np.sqrt(np.mean(frame ** 2) + 1e-10)))
+
+            peak_rms    = max(rms_env) if rms_env else 1.0
+            threshold   = peak_rms * 0.02          # ~−34 dB from peak
+            frame_dur   = rms_frame_sz / TARGET_SR
+
+            pause_segs  = []
+            in_pause    = False
+            pause_start = 0
+            for fi, val in enumerate(rms_env):
+                if val < threshold and not in_pause:
+                    in_pause, pause_start = True, fi
+                elif val >= threshold and in_pause:
+                    in_pause = False
+                    dur = (fi - pause_start) * frame_dur
+                    if dur > 0.05:   # ignore sub-50 ms blips
+                        pause_segs.append({
+                            "start_sec":    round(pause_start * frame_dur, 2),
+                            "end_sec":      round(fi * frame_dur, 2),
+                            "duration_sec": round(dur, 2),
+                        })
+
+            prosody_analysis = {
+                "rms_envelope":   [round(v, 6) for v in rms_env],
+                "energy_mean":    round(float(np.mean(rms_env)), 6),
+                "energy_std":     round(float(np.std(rms_env)), 6),
+                "energy_range":   round(float(peak_rms - min(rms_env)), 6),
+                "pause_count":    len(pause_segs),
+                "pause_segments": pause_segs,
+                "avg_pause_dur":  round(float(np.mean([p["duration_sec"] for p in pause_segs])), 3)
+                                  if pause_segs else 0.0,
+            }
+
+            preprocessing = {
+                "waveform":         waveform_points,
+                "mel_spectrogram":  mel_list,
+                "mfcc":             mfcc_list,
+                "psd":              psd_data,
+                "segments":         seg_boundaries,
+                "audio_metadata":   audio_meta,
+                "mfcc_analysis":    mfcc_analysis,
+                "artifact_analysis": artifact_analysis,
+                "prosody_analysis": prosody_analysis,
+            }
+        except Exception as prep_err:
+            print(f"[VARE] Preprocessing visualization failed: {prep_err}")
+            preprocessing = None
+        # ────────────────────────────────────────────────────────────────────
 
         a3_scores, a3_err = run_aasist3(segments)
         w2_scores, w2_err = run_wav2vec(segments)
@@ -226,11 +489,19 @@ async def analyze(file: UploadFile = File(...)):
 
         level, color  = risk_level(ensemble)
         active_scores = [s for s, _ in active]
-        confidence    = round(1.0 - float(np.std(active_scores)), 3) if len(active_scores) > 1 else 0.5
+        if len(active_scores) > 1:
+            verdicts   = [1 if s >= 0.5 else 0 for s in active_scores]
+            all_agree  = len(set(verdicts)) == 1
+            margin     = abs(ensemble - 0.5) * 2
+            confidence = round((1.0 if all_agree else 0.4) * 0.5 + margin * 0.5, 3)
+        else:
+            confidence = 0.5
 
         return JSONResponse({
             "status":           "ok",
             "filename":         file.filename,
+            "metadata_analysis": meta_result,
+            "preprocessing":    preprocessing,
             "duration_sec":     duration_sec,
             "n_segments":       n_segments,
             "ensemble_score":   round(ensemble * 100, 1),
@@ -270,7 +541,7 @@ async def analyze(file: UploadFile = File(...)):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     html_path = Path(__file__).parent / "index.html"
-    return HTMLResponse(html_path.read_text())
+    return HTMLResponse(html_path.read_text(encoding='utf-8'))
 
 
 @app.get("/health")
@@ -282,4 +553,4 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=8001, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8001, reload=False)

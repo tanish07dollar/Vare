@@ -1,0 +1,8 @@
+{
+  "extraPaths": [
+    "models/aasist3",
+    "models/aasist_reference"
+  ],
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "off"
+}

@@ -4,21 +4,26 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>VARE — Voice Authenticity Risk Engine</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
-    --bg:       #080c10;
-    --surface:  #0d1318;
-    --border:   #1a2530;
-    --border2:  #243040;
-    --text:     #c8d8e8;
-    --muted:    #4a6070;
-    --accent:   #00d4ff;
-    --low:      #22c55e;
-    --medium:   #f59e0b;
-    --high:     #ef4444;
-    --mono:     'Space Mono', monospace;
-    --sans:     'DM Sans', sans-serif;
+    --bg:        #f8fafc;
+    --surface:   #ffffff;
+    --surface2:  #f1f5f9;
+    --border:    #e2e8f0;
+    --border2:   #cbd5e1;
+    --text:      #0f172a;
+    --muted:     #64748b;
+    --accent:    #b45309;
+    --accent2:   #0891b2;
+    --low:       #16a34a;
+    --medium:    #d97706;
+    --high:      #dc2626;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Inter', sans-serif;
+    --sidebar-w: 240px;
+    --topbar-h:  56px;
+    --radius:    10px;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,727 +37,1313 @@
     overflow-x: hidden;
   }
 
-  /* Scanline overlay */
-  body::before {
-    content: '';
+  /* ── App Layout ── */
+  .app-layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
     position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,212,255,0.015) 2px,
-      rgba(0,212,255,0.015) 4px
-    );
-    pointer-events: none;
-    z-index: 999;
+    top: 0; left: 0;
+    height: 100vh;
+    z-index: 100;
+    overflow-y: auto;
+    box-shadow: 1px 0 4px rgba(0,0,0,0.06);
   }
 
-  /* ── Header ── */
-  header {
+  .sidebar-logo {
+    padding: 20px 20px 16px;
     border-bottom: 1px solid var(--border);
-    padding: 20px 40px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    position: relative;
+    gap: 12px;
+    flex-shrink: 0;
   }
 
-  header::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    width: 120px;
-    height: 1px;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-  }
-
-  .logo-mark {
-    width: 36px;
-    height: 36px;
-    border: 1.5px solid var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .logo-badge {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #b45309, #92400e);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
     font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
+    font-size: 11px; font-weight: 700;
+    color: #fff;
     letter-spacing: 0.05em;
-    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(180,83,9,0.30);
   }
 
-  .logo-mark::before {
-    content: '';
-    position: absolute;
-    inset: 3px;
-    border: 1px solid rgba(0,212,255,0.3);
-  }
-
-  .header-title { font-family: var(--mono); font-size: 13px; letter-spacing: 0.15em; color: var(--accent); }
-  .header-sub   { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; margin-top: 2px; }
-
-  .header-status {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .logo-title {
     font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
+    font-size: 13px; font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.1em;
+  }
+  .logo-sub {
+    font-size: 9px; color: var(--muted);
+    letter-spacing: 0.15em; margin-top: 1px;
   }
 
-  .status-dot {
+  .sidebar-nav { padding: 16px 0; flex: 1; }
+
+  .nav-section-label {
+    font-family: var(--mono);
+    font-size: 9px; letter-spacing: 0.2em;
+    color: var(--muted);
+    padding: 4px 20px 10px;
+    text-transform: uppercase;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+    cursor: pointer;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(180,83,9,0.06); border-left-color: var(--accent); }
+  .nav-item.active { color: var(--accent); background: rgba(180,83,9,0.08); border-left-color: var(--accent); }
+  .nav-icon { width: 16px; text-align: center; font-size: 12px; flex-shrink: 0; }
+
+  .sidebar-models {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+  .sidebar-models-title {
+    font-family: var(--mono);
+    font-size: 9px; letter-spacing: 0.2em;
+    color: var(--muted); margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .sidebar-model-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .sidebar-model-dot {
     width: 7px; height: 7px;
     border-radius: 50%;
-    background: var(--low);
-    box-shadow: 0 0 6px var(--low);
-    animation: pulse 2s ease-in-out infinite;
+    background: var(--border2);
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
   }
-
+  .sidebar-model-dot.loaded { background: var(--low); box-shadow: 0 0 5px rgba(22,163,74,0.5); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .sidebar-model-name { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted); flex: 1; }
+  .sidebar-model-score { font-family: var(--mono); font-size: 10px; color: var(--text); font-weight: 600; }
 
-  /* ── Layout ── */
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 40px 40px 80px;
-    display: grid;
-    gap: 24px;
-  }
-
-  /* ── Upload zone ── */
-  .upload-zone {
-    border: 1.5px dashed var(--border2);
-    padding: 48px 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    position: relative;
+  .sidebar-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 9px; color: var(--muted); letter-spacing: 0.1em;
+    flex-shrink: 0;
     background: var(--surface);
   }
 
-  .upload-zone:hover,
-  .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(0,212,255,0.03);
+  /* ── Main area ── */
+  .main-area {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 100vh;
   }
 
-  .upload-zone input[type=file] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
+  /* ── Topbar ── */
+  .topbar {
+    height: var(--topbar-h);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 32px; gap: 16px;
+    position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-
-  .upload-icon {
-    width: 48px; height: 48px;
-    margin: 0 auto 16px;
-    border: 1.5px solid var(--border2);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--muted);
-    font-size: 20px;
-  }
-
-  .upload-title { font-family: var(--mono); font-size: 13px; color: var(--text); margin-bottom: 6px; letter-spacing: 0.08em; }
-  .upload-sub   { font-size: 12px; color: var(--muted); }
-
-  .upload-btn {
-    margin-top: 20px;
-    display: inline-block;
-    padding: 10px 28px;
-    border: 1px solid var(--accent);
-    color: var(--accent);
+  .topbar-title {
     font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    background: transparent;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    font-size: 11px; letter-spacing: 0.2em; color: var(--muted);
+    flex-shrink: 0;
   }
-
-  .upload-btn:hover { background: var(--accent); color: var(--bg); }
-
-  .file-selected {
-    margin-top: 14px;
+  .topbar-file {
+    flex: 1;
     font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 0.08em;
+    font-size: 11px; color: var(--accent); letter-spacing: 0.06em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600;
+  }
+  .topbar-status {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    flex-shrink: 0;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--low); box-shadow: 0 0 5px rgba(22,163,74,0.5);
+    animation: pulse 2s ease-in-out infinite;
   }
 
-  /* ── Analyze button ── */
-  #analyze-btn {
-    width: 100%;
-    padding: 16px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 13px;
-    letter-spacing: 0.2em;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-    display: none;
+  /* ── Content area ── */
+  .content-area {
+    flex: 1;
+    padding: 32px 32px 80px;
+    display: flex; flex-direction: column; gap: 24px;
+    max-width: 1100px; width: 100%;
   }
-
-  #analyze-btn.visible { display: block; }
-
-  #analyze-btn::before {
-    content: '';
-    position: absolute;
-    left: -100%;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.1), transparent);
-    transition: left 0.4s;
-  }
-
-  #analyze-btn:hover::before { left: 100%; }
-  #analyze-btn:hover { background: rgba(0,212,255,0.08); box-shadow: 0 0 20px rgba(0,212,255,0.15); }
-  #analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  /* ── Loading ── */
-  #loading {
-    display: none;
-    text-align: center;
-    padding: 32px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-  }
-
-  .loading-bar {
-    width: 200px;
-    height: 2px;
-    background: var(--border);
-    margin: 16px auto 0;
-    overflow: hidden;
-  }
-
-  .loading-bar::after {
-    content: '';
-    display: block;
-    height: 100%;
-    width: 40%;
-    background: var(--accent);
-    animation: slide 1.2s ease-in-out infinite;
-    box-shadow: 0 0 8px var(--accent);
-  }
-
-  @keyframes slide {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
-  }
-
-  /* ── Results ── */
-  #results { display: none; animation: fadeIn 0.4s ease; }
-  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
 
   /* ── Section label ── */
   .section-label {
     font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
+    font-size: 10px; letter-spacing: 0.2em;
+    color: var(--muted); text-transform: uppercase;
     margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Hero card ── */
+  .hero-card {
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+    border: 1px solid #fde68a;
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    display: flex; align-items: flex-start; gap: 24px;
+    position: relative; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(180,83,9,0.08);
+  }
+  .hero-card::before {
+    content: '';
+    position: absolute; top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(180,83,9,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, rgba(180,83,9,0.15), rgba(180,83,9,0.06));
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
+  }
+  .hero-body { flex: 1; }
+  .hero-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .hero-desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+  .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hero-chip {
+    background: rgba(180,83,9,0.08);
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 11px; font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px; letter-spacing: 0.03em;
   }
 
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
+  /* ── Upload Zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    padding: 48px 40px; text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(180,83,9,0.03);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0;
+    cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    width: 52px; height: 52px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, rgba(180,83,9,0.12), rgba(180,83,9,0.04));
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-size: 22px;
+  }
+  .upload-title { font-family: var(--mono); font-size: 13px; color: var(--text); margin-bottom: 6px; letter-spacing: 0.08em; font-weight: 600; }
+  .upload-sub   { font-size: 12px; color: var(--muted); }
+  .upload-limits { display: flex; justify-content: center; gap: 12px; margin-top: 14px; }
+  .limit-badge {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    color: var(--muted); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 4px;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2);
+  }
+  .limit-badge span { color: var(--text); font-weight: 600; }
+  .upload-btn {
+    margin-top: 20px;
+    display: inline-block;
+    padding: 10px 28px;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+    background: transparent; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border-radius: 6px; font-weight: 700;
+  }
+  .upload-btn:hover { background: var(--accent); color: #fff; }
+  .file-selected { margin-top: 14px; font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; font-weight: 600; }
+
+  /* ── Button Row ── */
+  #btn-row { display: none; gap: 10px; }
+  #btn-row.visible { display: flex; }
+  #analyze-btn {
+    flex: 1; padding: 16px;
+    border: none;
+    background: linear-gradient(135deg, #b45309, #92400e);
+    color: #fff;
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.2em;
+    cursor: pointer; transition: all 0.2s;
+    border-radius: var(--radius); font-weight: 700;
+    box-shadow: 0 4px 14px rgba(180,83,9,0.30);
+  }
+  #analyze-btn:hover { box-shadow: 0 4px 22px rgba(180,83,9,0.48); transform: translateY(-1px); }
+  #analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  #play-btn {
+    width: 52px; flex-shrink: 0;
+    border: 1.5px solid var(--border2);
+    background: var(--surface); color: var(--muted);
+    font-size: 16px; cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  #play-btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); background: rgba(8,145,178,0.05); }
+  #play-btn.playing { border-color: var(--accent2); color: var(--accent2); }
+  #play-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── Loading ── */
+  #loading {
+    display: none; text-align: center; padding: 32px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.1em;
+  }
+  .loading-bar {
+    width: 200px; height: 3px;
+    background: var(--border);
+    margin: 16px auto 0; overflow: hidden; border-radius: 2px;
+  }
+  .loading-bar::after {
+    content: ''; display: block; height: 100%; width: 40%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    animation: slide 1.2s ease-in-out infinite;
+    border-radius: 2px;
+  }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+
+  /* ── Fade / Results ── */
+  #results { display: none; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+  .fade-section { opacity: 0; transition: opacity 0.3s ease; }
+  .fade-section.visible { opacity: 1; }
 
   /* ── Verdict banner ── */
   .verdict-banner {
-    border: 1.5px solid var(--border2);
-    background: var(--surface);
+    border: 1px solid #fde68a;
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+    border-radius: var(--radius);
     padding: 28px 32px;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 32px;
+    display: grid; grid-template-columns: auto 1fr auto;
+    align-items: center; gap: 32px;
+    box-shadow: 0 2px 8px rgba(180,83,9,0.08);
   }
-
   .verdict-score {
-    font-family: var(--mono);
-    font-size: 56px;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--accent);
-    transition: color 0.4s;
+    font-family: var(--mono); font-size: 56px; font-weight: 700;
+    line-height: 1; color: var(--accent); transition: color 0.4s;
   }
-
-  .verdict-score span {
-    font-size: 18px;
-    color: var(--muted);
-    vertical-align: super;
-  }
-
-  .verdict-info { }
-  .verdict-level {
-    font-family: var(--mono);
-    font-size: 22px;
-    letter-spacing: 0.15em;
-    margin-bottom: 6px;
-  }
-
-  .verdict-detail {
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  /* ── Gauge ── */
-  .gauge-wrap {
-    width: 120px;
-    text-align: center;
-  }
-
+  .verdict-score span { font-size: 18px; color: var(--muted); vertical-align: super; }
+  .verdict-level { font-family: var(--mono); font-size: 22px; letter-spacing: 0.15em; margin-bottom: 6px; font-weight: 700; }
+  .verdict-detail { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .gauge-wrap { width: 120px; text-align: center; }
   .gauge-wrap svg { overflow: visible; }
 
-  /* ── Stats row ── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+  /* ── Gradient Stat Pills ── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat-pill {
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    position: relative; overflow: hidden;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-
-  .stat-box {
-    border: 1px solid var(--border);
-    background: var(--surface);
-    padding: 16px;
-  }
-
+  .pill-pink   { background: linear-gradient(135deg, #fdf4ff, #fae8ff); border-color: #e9d5ff; }
+  .pill-cyan   { background: linear-gradient(135deg, #ecfeff, #cffafe); border-color: #a5f3fc; }
+  .pill-orange { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+  .pill-gold   { background: linear-gradient(135deg, #fefce8, #fef9c3); border-color: #fef08a; }
   .stat-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    color: var(--muted);
-    margin-bottom: 8px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em;
+    color: var(--muted); margin-bottom: 8px; text-transform: uppercase;
   }
+  .stat-value { font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--text); }
+  .pill-pink   .stat-value { color: #7e22ce; }
+  .pill-cyan   .stat-value { color: #0891b2; }
+  .pill-orange .stat-value { color: #b45309; }
+  .pill-gold   .stat-value { color: #854d0e; }
+  .stat-unit { font-size: 12px; opacity: 0.7; font-weight: 400; }
 
-  .stat-value {
-    font-family: var(--mono);
-    font-size: 22px;
-    color: var(--text);
-  }
-
-  .stat-unit { font-size: 12px; color: var(--muted); }
-
-  /* ── Model cards ── */
-  .models-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
+  /* ── Model Cards ── */
+  .models-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .model-card {
-    border: 1px solid var(--border);
     background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 20px;
-    position: relative;
-    overflow: hidden;
+    text-align: center;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-
-  .model-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 3px;
-    height: 100%;
-    background: var(--accent);
-  }
-
+  .model-card:hover { border-color: #fde68a; box-shadow: 0 4px 16px rgba(180,83,9,0.10); }
   .model-card.unavailable { opacity: 0.4; }
-  .model-card.unavailable::before { background: var(--muted); }
-
-  .model-name {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    margin-bottom: 4px;
+  .model-card-accent {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
   }
+  .model-name { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 3px; margin-top: 6px; font-weight: 700; }
+  .model-desc { font-size: 10px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .model-gauge-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+  .prob-bar-wrap { display: none; }
+  .prob-bar { height: 100%; background: var(--accent); transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+  .model-score-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
 
-  .model-desc {
-    font-size: 11px;
-    color: var(--muted);
-    margin-bottom: 16px;
-    line-height: 1.5;
-  }
-
-  .model-score-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    margin-bottom: 6px;
-  }
-
-  .model-score-value {
-    font-family: var(--mono);
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 10px;
-  }
-
-  .prob-bar-wrap {
-    height: 3px;
-    background: var(--border);
-    margin-bottom: 12px;
-    position: relative;
-  }
-
-  .prob-bar {
-    height: 100%;
-    background: var(--accent);
-    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
-    position: relative;
-  }
-
-  .prob-bar::after {
-    content: '';
-    position: absolute;
-    right: 0; top: -3px;
-    width: 1px; height: 9px;
-    background: var(--accent);
-    box-shadow: 0 0 4px var(--accent);
-  }
-
-  /* ── Segment chart ── */
+  /* ── Segment Section ── */
   .segment-section {
     border: 1px solid var(--border);
     background: var(--surface);
+    border-radius: var(--radius);
     padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
 
-  .segment-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    height: 80px;
-    margin-top: 12px;
+  /* ── Preprocessing panel ── */
+  #preprocessing-panel { display: none; }
+  .preproc-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-
-  .seg-bar-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    height: 100%;
-    justify-content: flex-end;
+  .waveform-canvas-wrap { position: relative; width: 100%; cursor: crosshair; }
+  #waveform-canvas {
+    display: block; width: 100%; height: 130px;
+    background: var(--surface2); border-radius: 6px;
+    border: 1px solid var(--border);
   }
-
-  .seg-bar {
-    width: 100%;
-    min-height: 2px;
-    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
-    position: relative;
-  }
-
-  .seg-bar:hover::after {
-    content: attr(data-tip);
+  .waveform-seg-labels { display: flex; margin-top: 4px; position: relative; height: 16px; }
+  .waveform-seg-label {
     position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
+    font-family: var(--mono); font-size: 9px; color: var(--muted);
     transform: translateX(-50%);
-    background: var(--border2);
-    border: 1px solid var(--border2);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 3px 7px;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 10;
   }
 
-  .seg-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--muted);
-    white-space: nowrap;
+  .chart-sub-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+    color: var(--muted); text-transform: uppercase;
+    margin: 14px 0 4px;
+    display: flex; align-items: center; gap: 8px;
   }
+  .chart-sub-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  #db-canvas {
+    display: block; width: 100%; height: 70px;
+    background: var(--surface2); border-radius: 6px; margin-top: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .meta-cards-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .preproc-stat {
+    flex: 1; min-width: 100px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 12px 14px; border-radius: 8px;
+  }
+  .meta-card-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    color: var(--muted); margin-bottom: 6px; text-transform: uppercase;
+  }
+  .meta-card-value { font-family: var(--mono); font-size: 18px; color: var(--accent2); font-weight: 700; }
+  .meta-card-unit  { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+  .heatmap-row { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+  .heatmap-wrap { flex: 1; min-width: 260px; }
+  .heatmap-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    color: var(--muted); margin-bottom: 6px; text-transform: uppercase;
+  }
+  .heatmap-wrap canvas { display: block; width: 100%; height: 180px; background: var(--surface2); border-radius: 4px; border: 1px solid var(--border); }
+  .heatmap-placeholder {
+    height: 180px; border: 1px solid var(--border); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: var(--surface2);
+  }
+
+  .psd-wrap { margin-top: 16px; }
+  .psd-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    color: var(--muted); margin-bottom: 6px; text-transform: uppercase;
+  }
+  #psd-canvas { display: block; width: 100%; height: 160px; background: var(--surface2); border-radius: 4px; border: 1px solid var(--border); }
+  .psd-placeholder {
+    height: 160px; border: 1px solid var(--border); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: var(--surface2);
+  }
+
+  #playhead {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    width: 2px;
+    background: rgba(180,83,9,0.9);
+    box-shadow: 0 0 5px rgba(180,83,9,0.5);
+    pointer-events: none; display: none; z-index: 2;
+    transition: left 0.05s linear;
+  }
+
+  /* ── Agreement indicator ── */
+  .agreement-indicator {
+    display: flex; align-items: stretch; gap: 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    margin-top: 12px; overflow: hidden;
+    border-radius: var(--radius);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .agree-header {
+    background: var(--surface2); border-right: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .agree-header span {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+    color: var(--muted); writing-mode: vertical-rl;
+    text-orientation: mixed; transform: rotate(180deg);
+  }
+  .agree-models { display: flex; flex: 1; }
+  .agree-pill {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px; padding: 12px 8px;
+    border-right: 1px solid var(--border);
+  }
+  .agree-pill-model  { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+  .agree-pill-verdict { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; }
+  .agree-pill-score  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .agree-final {
+    flex-shrink: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px; padding: 12px 20px; background: var(--surface2);
+  }
+  .agree-final-label   { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.12em; }
+  .agree-final-verdict { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-align: center; }
+  .agree-final-count   { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  /* ── Per-model segment strips ── */
+  .seg-model-strips { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .seg-model-row { display: flex; align-items: center; gap: 10px; }
+  .seg-model-label {
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    letter-spacing: 0.1em; width: 84px; flex-shrink: 0; text-align: right; font-weight: 700;
+  }
+  .seg-model-label.unavailable { color: var(--muted); }
+  .seg-blocks { display: flex; gap: 3px; flex: 1; }
+  .seg-block {
+    flex: 1; height: 26px; min-width: 10px;
+    position: relative; cursor: default;
+    transition: opacity 0.15s; border-radius: 3px;
+  }
+  .seg-block:hover { opacity: 0.75; }
+  .seg-block::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--text); color: var(--surface);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 8px; white-space: nowrap;
+    pointer-events: none; z-index: 20; display: none; border-radius: 4px;
+  }
+  .seg-block:hover::after { display: block; }
+  .seg-unavailable-row {
+    flex: 1; height: 26px; display: flex; align-items: center;
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    border: 1px dashed var(--border2); padding: 0 10px; border-radius: 3px;
+    background: var(--surface2);
+  }
+  .seg-time-labels { display: flex; gap: 3px; padding-left: 94px; margin-top: 4px; }
+  .seg-time-label {
+    flex: 1; font-family: var(--mono); font-size: 9px;
+    color: var(--muted); text-align: center; min-width: 10px; overflow: hidden;
+  }
+
+  /* ── Acoustic Analysis ── */
+  #acoustic-panel { display: none; }
+  .acoustic-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .acoustic-grid { grid-template-columns: 1fr; } }
+  .acoustic-card {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s;
+  }
+  .acoustic-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+  .acoustic-card-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .acoustic-card-title  { font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 4px; font-weight: 700; }
+  .acoustic-card-sub    { font-size: 10px; color: var(--muted); line-height: 1.4; }
+  .acoustic-card-body   { padding: 14px 16px; flex: 1; }
+
+  .mfcc-chart-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .mfcc-coeff-row  { display: flex; align-items: center; gap: 6px; }
+  .mfcc-coeff-label {
+    font-family: var(--mono); font-size: 9px; color: var(--muted);
+    width: 22px; flex-shrink: 0; text-align: right;
+  }
+  .mfcc-bar-track { flex: 1; height: 8px; background: var(--border); position: relative; overflow: visible; border-radius: 2px; }
+  .mfcc-bar-fill  { height: 100%; position: absolute; top: 0; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); border-radius: 2px; }
+  .mfcc-bar-std   { position: absolute; top: -2px; height: 12px; background: rgba(0,0,0,0.08); pointer-events: none; border-radius: 1px; }
+  .mfcc-legend { display: flex; gap: 12px; margin-top: 10px; margin-bottom: 6px; }
+  .mfcc-legend-item { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .mfcc-legend-dot  { width: 8px; height: 8px; border-radius: 2px; }
+
+  .artifact-meters { display: flex; flex-direction: column; gap: 12px; }
+  .artifact-meter-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .artifact-meter-name  { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+  .artifact-meter-value { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+  .artifact-meter-track { height: 6px; background: var(--border); position: relative; border-radius: 3px; }
+  .artifact-meter-fill  { height: 100%; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); border-radius: 3px; }
+  .artifact-interpretation {
+    margin-top: 12px; padding: 8px 10px;
+    background: #fffbeb; border-left: 3px solid var(--accent);
+    font-size: 10px; color: #78350f; line-height: 1.5;
+    border-radius: 0 4px 4px 0;
+  }
+  .artifact-interpretation b { color: var(--text); font-weight: 600; }
+
+  .prosody-canvas-wrap { margin-bottom: 10px; }
+  #prosody-canvas { display: block; width: 100%; height: 80px; background: var(--surface2); border-radius: 4px; border: 1px solid var(--border); }
+  .prosody-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .prosody-stat  { background: var(--surface2); border: 1px solid var(--border); padding: 8px 10px; border-radius: 6px; }
+  .prosody-stat-label  { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; }
+  .prosody-stat-value  { font-family: var(--mono); font-size: 14px; color: var(--text); font-weight: 600; }
+  .prosody-stat-unit   { font-size: 9px; color: var(--muted); font-weight: 400; }
+  .pause-map { height: 12px; background: var(--border); position: relative; margin: 10px 0 4px; overflow: hidden; border-radius: 4px; }
+  .pause-seg { position: absolute; top: 0; height: 100%; background: rgba(8,145,178,0.45); }
+  .pause-map-label { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .model-insights { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .model-insight-row { display: flex; align-items: flex-start; gap: 8px; }
+  .insight-model-tag {
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em;
+    color: #fff; background: var(--accent);
+    padding: 2px 5px; flex-shrink: 0; margin-top: 1px; white-space: nowrap; border-radius: 3px;
+    font-weight: 700;
+  }
+  .insight-model-tag.w2v { background: #0891b2; }
+  .insight-model-tag.rn  { background: #16a34a; }
+  .insight-text  { font-size: 10px; color: var(--muted); line-height: 1.4; }
+  .insight-score { margin-left: auto; flex-shrink: 0; font-family: var(--mono); font-size: 11px; padding-left: 8px; font-weight: 700; }
+
+  /* ── Agreement matrix ── */
+  #agreement-panel { display: none; }
+  .matrix-table-wrap { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); padding: 20px; overflow-x: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .matrix-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .matrix-table th {
+    color: var(--accent); font-size: 10px; letter-spacing: 0.12em;
+    padding: 8px 10px; text-align: center;
+    border-bottom: 2px solid var(--border2); white-space: nowrap; text-transform: uppercase;
+  }
+  .matrix-table th:first-child { text-align: left; }
+  .matrix-table td { padding: 6px 10px; text-align: center; color: var(--text); border-bottom: 1px solid var(--border); }
+  .matrix-table td:first-child { text-align: left; color: var(--muted); font-weight: 600; }
+  .matrix-table tr.disagree td:first-child { border-left: 3px solid #d97706; }
+  .matrix-table tr:hover td { background: var(--surface2); }
+
+  /* ── Metadata analysis ── */
+  #meta-panel { display: none; }
+  #meta-panel .meta-card {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: var(--radius); padding: 20px 24px;
+    display: flex; align-items: flex-start; gap: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .meta-indicator { flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
+  .meta-indicator.flagged { background: var(--high); box-shadow: 0 0 6px rgba(220,38,38,0.4); }
+  .meta-indicator.clean   { background: var(--low);  box-shadow: 0 0 6px rgba(22,163,74,0.4);  }
+  .meta-body   { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .meta-status { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; }
+  .meta-status.flagged { color: var(--high); }
+  .meta-status.clean   { color: var(--low);  }
+  .meta-reason { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .meta-fields { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .meta-field-pill {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border2); padding: 4px 10px;
+    font-family: var(--mono); font-size: 11px; border-radius: 4px;
+    background: var(--surface2);
+  }
+  .meta-field-pill .pill-key { color: var(--muted); }
+  .meta-field-pill .pill-val { color: var(--accent2); font-weight: 600; }
+  .meta-no-flag { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+  /* ── Raw JSON ── */
+  #raw-json-panel { display: none; }
+  .raw-json-wrap { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); position: relative; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .raw-json-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface2);
+  }
+  .raw-json-toolbar span { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+  .raw-json-copy {
+    background: transparent; border: 1px solid var(--border2);
+    color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    padding: 4px 12px; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; border-radius: 4px;
+  }
+  .raw-json-copy:hover   { border-color: var(--accent); color: var(--accent); background: rgba(180,83,9,0.06); }
+  .raw-json-copy.copied  { border-color: var(--low);    color: var(--low);    background: rgba(22,163,74,0.06); }
+  #raw-json-pre {
+    margin: 0; padding: 20px;
+    font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--text);
+    overflow-x: auto; white-space: pre; max-height: 480px; overflow-y: auto;
+    background: #fafaf9;
+  }
+  .json-key  { color: #92400e; font-weight: 600; }
+  .json-str  { color: #166534; }
+  .json-num  { color: #c2410c; }
+  .json-bool { color: #7c3aed; font-weight: 600; }
+  .json-null { color: #94a3b8; }
+
+  /* ── Limit modal ── */
+  #limit-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,23,42,0.5); z-index: 1000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #limit-overlay.visible { display: flex; }
+  .limit-modal {
+    background: var(--surface); border: 1.5px solid var(--high);
+    width: 100%; max-width: 420px; padding: 32px;
+    position: relative; box-shadow: 0 8px 32px rgba(220,38,38,0.15);
+    animation: fadeIn 0.2s ease; border-radius: var(--radius);
+  }
+  .limit-modal::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 100%; height: 3px; background: var(--high);
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .modal-icon { width: 40px; height: 40px; border: 1.5px solid var(--high); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--high); font-size: 18px; margin-bottom: 16px; }
+  .modal-title { font-family: var(--mono); font-size: 13px; letter-spacing: 0.15em; color: var(--high); margin-bottom: 10px; font-weight: 700; }
+  .modal-body  { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
+  .modal-body strong { color: var(--text); font-weight: 600; }
+  .modal-limit-row { display: flex; gap: 10px; margin: 14px 0 20px; }
+  .modal-limit-pill { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; border: 1px solid var(--border2); padding: 6px 12px; color: var(--muted); border-radius: 6px; background: var(--surface2); }
+  .modal-limit-pill span { color: var(--text); display: block; font-size: 14px; margin-top: 2px; font-weight: 700; }
+  .modal-close {
+    width: 100%; padding: 11px; border: 1.5px solid var(--high);
+    background: transparent; color: var(--high);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em;
+    cursor: pointer; transition: background 0.2s, color 0.2s; border-radius: 6px; font-weight: 700;
+  }
+  .modal-close:hover { background: var(--high); color: #fff; }
 
   /* ── Error ── */
   #error-box {
-    display: none;
-    border: 1px solid var(--high);
-    background: rgba(239,68,68,0.05);
-    padding: 20px 24px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--high);
-    letter-spacing: 0.05em;
+    display: none; border: 1px solid var(--high);
+    background: #fef2f2;
+    padding: 20px 24px; font-family: var(--mono);
+    font-size: 12px; color: var(--high); letter-spacing: 0.05em;
+    border-radius: var(--radius);
   }
 
-  /* ── Footer ── */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 20px 40px;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    display: flex;
-    justify-content: space-between;
-  }
+  @keyframes skeleton-pulse { 0%,100% { background-color: var(--surface); } 50% { background-color: var(--border2); } }
+  .skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; border-radius: 2px; }
 </style>
 </head>
 <body>
+<div class="app-layout">
 
-<header>
-  <div class="logo-mark">VA</div>
-  <div>
-    <div class="header-title">VARE</div>
-    <div class="header-sub">VOICE AUTHENTICITY RISK ENGINE</div>
-  </div>
-  <div class="header-status">
-    <div class="status-dot"></div>
-    <span id="status-text">SYSTEM READY</span>
-  </div>
-</header>
-
-<main>
-
-  <!-- Upload -->
-  <div>
-    <div class="section-label">AUDIO INPUT</div>
-    <div class="upload-zone" id="drop-zone">
-      <input type="file" id="file-input" accept=".wav,.mp3,.flac,.m4a,.ogg"/>
-      <div class="upload-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-        </svg>
-      </div>
-      <div class="upload-title">DROP AUDIO FILE HERE</div>
-      <div class="upload-sub">WAV · MP3 · FLAC · M4A · OGG</div>
-      <button class="upload-btn" onclick="document.getElementById('file-input').click(); event.stopPropagation()">BROWSE FILES</button>
-      <div class="file-selected" id="file-name"></div>
+<!-- ── Sidebar ────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-badge">VA</div>
+    <div>
+      <div class="logo-title">VARE</div>
+      <div class="logo-sub">RISK ENGINE</div>
     </div>
   </div>
 
-  <!-- Analyze -->
-  <button id="analyze-btn" onclick="runAnalysis()">▶ RUN VOICE ANALYSIS</button>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Navigation</div>
+    <a href="#upload-section" class="nav-item active" onclick="setActive(this)">
+      <span class="nav-icon">⬆</span> Upload Audio
+    </a>
+    <a href="#results" class="nav-item" onclick="setActive(this)">
+      <span class="nav-icon">◆</span> Risk Assessment
+    </a>
+    <a href="#acoustic-panel" class="nav-item" onclick="setActive(this)">
+      <span class="nav-icon">≋</span> Acoustic Analysis
+    </a>
+    <!-- DISABLED: Model Decisions nav item hidden -->
+    <a href="#agreement-panel" class="nav-item" onclick="setActive(this)" style="display:none">
+      <span class="nav-icon">⊡</span> Model Decisions
+    </a>
+    <a href="#meta-panel" class="nav-item" onclick="setActive(this)">
+      <span class="nav-icon">◎</span> Metadata
+    </a>
+    <a href="#raw-json-panel" class="nav-item" onclick="setActive(this)">
+      <span class="nav-icon">{ }</span> Raw Response
+    </a>
+  </nav>
 
-  <!-- Loading -->
-  <div id="loading">
-    <div id="loading-text">INITIALISING MODELS</div>
-    <div class="loading-bar"></div>
+  <div class="sidebar-models">
+    <div class="sidebar-models-title">Model Status</div>
+    <div class="sidebar-model-row">
+      <div class="sidebar-model-dot" id="dot-aasist3"></div>
+      <div class="sidebar-model-name">AASIST3</div>
+      <div class="sidebar-model-score" id="dot-score-aasist3">--</div>
+    </div>
+    <div class="sidebar-model-row">
+      <div class="sidebar-model-dot" id="dot-wav2vec2"></div>
+      <div class="sidebar-model-name">WAV2VEC2</div>
+      <div class="sidebar-model-score" id="dot-score-wav2vec2">--</div>
+    </div>
+    <div class="sidebar-model-row">
+      <div class="sidebar-model-dot" id="dot-rawnet2"></div>
+      <div class="sidebar-model-name">RAWNET2</div>
+      <div class="sidebar-model-score" id="dot-score-rawnet2">--</div>
+    </div>
   </div>
 
-  <!-- Error -->
-  <div id="error-box"></div>
+  <div class="sidebar-footer">
+    <div id="footer-device">--</div>
+    <div style="margin-top:4px">v1.0 · 2026</div>
+  </div>
+</aside>
 
-  <!-- Results -->
-  <div id="results">
+<!-- ── Main Area ─────────────────────────────── -->
+<div class="main-area">
 
-    <!-- Verdict -->
-    <div class="section-label">RISK ASSESSMENT</div>
-    <div class="verdict-banner">
-      <div class="verdict-score" id="v-score">--<span>/100</span></div>
-      <div class="verdict-info">
-        <div class="verdict-level" id="v-level">--</div>
-        <div class="verdict-detail" id="v-detail"></div>
-      </div>
-      <div class="gauge-wrap">
-        <svg width="120" height="70" viewBox="0 0 120 70">
-          <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#1a2530" stroke-width="8" stroke-linecap="round"/>
-          <path id="gauge-arc" d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#00d4ff" stroke-width="8" stroke-linecap="round"
-                stroke-dasharray="157" stroke-dashoffset="157"/>
-          <text id="gauge-pct" x="60" y="58" text-anchor="middle" font-family="Space Mono" font-size="14" fill="#c8d8e8">0%</text>
-        </svg>
+  <div class="topbar">
+    <div class="topbar-title">VOICE AUTHENTICITY RISK ENGINE</div>
+    <div class="topbar-file" id="topbar-file"></div>
+    <div class="topbar-status">
+      <div class="status-dot"></div>
+      <span id="status-text">SYSTEM READY</span>
+    </div>
+  </div>
+
+  <div class="content-area">
+
+    <!-- Hero -->
+    <div class="hero-card">
+      <div class="hero-icon">🛡</div>
+      <div class="hero-body">
+        <div class="hero-title">What is VARE?</div>
+        <div class="hero-desc">
+          Voice Authenticity Risk Engine uses three specialized neural network models — AASIST3, Wav2Vec 2.0, and RawNet2 — to detect AI-generated, cloned, or synthetically produced audio. Upload a voice recording to receive a detailed forensic analysis with per-segment breakdown, acoustic fingerprinting, and prosody evaluation.
+        </div>
+        <div class="hero-chips">
+          <span class="hero-chip">Deepfake Detection</span>
+          <span class="hero-chip">Voice Fraud Prevention</span>
+          <span class="hero-chip">Content Authenticity</span>
+          <span class="hero-chip">3-Model Ensemble</span>
+        </div>
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-row" style="margin-top:12px">
-      <div class="stat-box">
-        <div class="stat-label">DURATION</div>
-        <div class="stat-value" id="s-dur">--<span class="stat-unit"> s</span></div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">SEGMENTS ANALYSED</div>
-        <div class="stat-value" id="s-seg">--</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">MODEL AGREEMENT</div>
-        <div class="stat-value" id="s-conf">--<span class="stat-unit">%</span></div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">MODELS ACTIVE</div>
-        <div class="stat-value" id="s-mods">--<span class="stat-unit">/3</span></div>
+    <!-- Limit modal -->
+    <div id="limit-overlay" onclick="closeModal(event)">
+      <div class="limit-modal">
+        <div class="modal-icon">⚠</div>
+        <div class="modal-title" id="modal-title">LIMIT EXCEEDED</div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-limit-row">
+          <div class="modal-limit-pill">MAX FILE SIZE <span>25 MB</span></div>
+          <div class="modal-limit-pill">MAX DURATION <span>5 MIN</span></div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">DISMISS</button>
       </div>
     </div>
 
-    <!-- Model breakdown -->
-    <div style="margin-top:24px">
-      <div class="section-label">MODEL BREAKDOWN</div>
-      <div class="models-grid">
+    <!-- Upload -->
+    <div id="upload-section">
+      <div class="section-label">AUDIO INPUT</div>
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".wav,.mp3,.flac,.m4a,.ogg"/>
+        <div class="upload-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+        </div>
+        <div class="upload-title">DROP AUDIO FILE HERE</div>
+        <div class="upload-sub">WAV · MP3 · FLAC · M4A · OGG</div>
+        <div class="upload-limits">
+          <div class="limit-badge">MAX SIZE <span>25 MB</span></div>
+          <div class="limit-badge">MAX DURATION <span>5 MIN</span></div>
+        </div>
+        <button class="upload-btn" onclick="document.getElementById('file-input').click(); event.stopPropagation()">BROWSE FILES</button>
+        <div class="file-selected" id="file-name"></div>
+      </div>
+    </div>
 
-        <div class="model-card" id="card-aasist3">
-          <div class="model-name">AASIST3</div>
-          <div class="model-desc">Graph attention · spectro-temporal · KAN layers</div>
-          <div class="model-score-label">SPOOF PROBABILITY</div>
-          <div class="model-score-value" id="aasist3-score">--</div>
-          <div class="prob-bar-wrap"><div class="prob-bar" id="aasist3-bar" style="width:0%"></div></div>
+    <audio id="audio-player" preload="none"></audio>
+
+    <div id="btn-row">
+      <button id="play-btn" title="Play / Pause" disabled onclick="togglePlay()">▶</button>
+      <button id="analyze-btn" onclick="runAnalysis()">▶ RUN VOICE ANALYSIS</button>
+    </div>
+
+    <div id="loading">
+      <div id="loading-text">INITIALISING MODELS</div>
+      <div class="loading-bar"></div>
+    </div>
+
+    <div id="error-box"></div>
+
+    <!-- Preprocessing panel -->
+    <div id="preprocessing-panel" class="fade-section">
+      <div class="section-label">AUDIO SIGNALS</div>
+      <div class="preproc-card">
+        <div class="chart-sub-label" style="margin-top:0">AMPLITUDE vs TIME</div>
+        <div class="waveform-canvas-wrap" id="waveform-wrap">
+          <canvas id="waveform-canvas"></canvas>
+          <div id="playhead"></div>
+        </div>
+        <div class="waveform-seg-labels" id="waveform-seg-labels"></div>
+
+        <div class="chart-sub-label">ENERGY (dB vs TIME)</div>
+        <canvas id="db-canvas"></canvas>
+
+        <div class="meta-cards-row">
+          <div class="preproc-stat">
+            <div class="meta-card-label">Duration</div>
+            <div class="meta-card-value" id="meta-duration">--<span class="meta-card-unit"> s</span></div>
+          </div>
+          <div class="preproc-stat">
+            <div class="meta-card-label">Sample Rate</div>
+            <div class="meta-card-value" id="meta-sr">--<span class="meta-card-unit"> Hz</span></div>
+          </div>
+          <div class="preproc-stat">
+            <div class="meta-card-label">Segments</div>
+            <div class="meta-card-value" id="meta-segs">--</div>
+          </div>
+          <div class="preproc-stat">
+            <div class="meta-card-label">Total Samples</div>
+            <div class="meta-card-value" id="meta-samples">--</div>
+          </div>
         </div>
 
-        <div class="model-card" id="card-wav2vec2">
-          <div class="model-name">WAV2VEC 2.0</div>
-          <div class="model-desc">SSL transformer · contrastive pretraining · XLSR</div>
-          <div class="model-score-label">SPOOF PROBABILITY</div>
-          <div class="model-score-value" id="wav2vec2-score">--</div>
-          <div class="prob-bar-wrap"><div class="prob-bar" id="wav2vec2-bar" style="width:0%"></div></div>
+        <!-- DISABLED: Mel Spectrogram, MFCC, PSD sections hidden -->
+        <div style="display:none">
+        <div class="chart-sub-label">SPECTROGRAM (Frequency vs Time)</div>
+        <div class="heatmap-row">
+          <div class="heatmap-wrap">
+            <div class="heatmap-title">Mel Spectrogram — Freq (Mel scale) × Time</div>
+            <div id="mel-placeholder" class="heatmap-placeholder" style="display:none;">Not available</div>
+            <canvas id="mel-canvas"></canvas>
+          </div>
+          <div class="heatmap-wrap">
+            <div class="heatmap-title">MFCC Coefficients</div>
+            <div id="mfcc-placeholder" class="heatmap-placeholder" style="display:none;">Not available</div>
+            <canvas id="mfcc-canvas"></canvas>
+          </div>
         </div>
 
-        <div class="model-card" id="card-rawnet2">
-          <div class="model-name">RAWNET2</div>
-          <div class="model-desc">SincConv · residual blocks · FMS · GRU</div>
-          <div class="model-score-label">SPOOF PROBABILITY</div>
-          <div class="model-score-value" id="rawnet2-score">--</div>
-          <div class="prob-bar-wrap"><div class="prob-bar" id="rawnet2-bar" style="width:0%"></div></div>
+        <div class="psd-wrap">
+          <div class="psd-title">Frequency Spectrum (PSD)</div>
+          <div id="psd-placeholder" class="psd-placeholder" style="display:none;">Not available</div>
+          <canvas id="psd-canvas"></canvas>
+        </div>
+        </div><!-- end DISABLED -->
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="fade-section">
+
+      <div class="section-label">RISK ASSESSMENT</div>
+      <div class="verdict-banner">
+        <div class="verdict-score" id="v-score">--<span>/100</span></div>
+        <div class="verdict-info">
+          <div class="verdict-level" id="v-level">--</div>
+          <div class="verdict-detail" id="v-detail"></div>
+        </div>
+        <div class="gauge-wrap">
+          <svg width="120" height="70" viewBox="0 0 120 70">
+            <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round"/>
+            <path id="gauge-arc" d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#b45309" stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="157" stroke-dashoffset="157"/>
+            <text id="gauge-pct" x="60" y="58" text-anchor="middle" font-family="Space Mono" font-size="14" fill="#0f172a" font-weight="700">0%</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Gradient stat pills -->
+      <div class="stats-row" style="margin-top:16px">
+        <div class="stat-pill pill-pink">
+          <div class="stat-label">DURATION</div>
+          <div class="stat-value" id="s-dur">--<span class="stat-unit"> s</span></div>
+        </div>
+        <div class="stat-pill pill-cyan">
+          <div class="stat-label">SEGMENTS ANALYSED</div>
+          <div class="stat-value" id="s-seg">--</div>
+        </div>
+        <!-- DISABLED: Model Agreement stat pill hidden -->
+        <div class="stat-pill pill-orange" style="display:none">
+          <div class="stat-label">MODEL AGREEMENT</div>
+          <div class="stat-value" id="s-conf">--<span class="stat-unit">%</span></div>
+        </div>
+        <div class="stat-pill pill-gold">
+          <div class="stat-label">MODELS ACTIVE</div>
+          <div class="stat-value" id="s-mods">--<span class="stat-unit">/3</span></div>
+        </div>
+      </div>
+
+      <!-- DISABLED: Agreement indicator hidden -->
+      <div id="agreement-indicator" style="display:none"></div>
+
+      <!-- Model breakdown -->
+      <div style="margin-top:24px">
+        <div class="section-label">MODEL BREAKDOWN</div>
+        <div class="models-grid">
+
+          <div class="model-card" id="card-aasist3">
+            <div class="model-card-accent"></div>
+            <div class="model-name">AASIST3</div>
+            <div class="model-desc">Graph attention · spectro-temporal · KAN layers</div>
+            <div class="model-gauge-wrap">
+              <svg viewBox="0 0 100 100" width="110" height="110">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+                <circle id="aasist3-gauge-arc" cx="50" cy="50" r="40" fill="none" stroke="#b45309"
+                        stroke-width="8" stroke-linecap="round"
+                        stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                        transform="rotate(-90 50 50)"
+                        style="transition:stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1),stroke 0.4s"/>
+                <text id="aasist3-score" x="50" y="50" text-anchor="middle" dominant-baseline="middle"
+                      font-family="Space Mono,monospace" font-size="15" font-weight="700" fill="#0f172a">--</text>
+              </svg>
+            </div>
+            <div class="model-score-label">SPOOF PROBABILITY</div>
+            <div class="prob-bar-wrap"><div class="prob-bar" id="aasist3-bar" style="width:0%"></div></div>
+          </div>
+
+          <div class="model-card" id="card-wav2vec2">
+            <div class="model-card-accent"></div>
+            <div class="model-name">WAV2VEC 2.0</div>
+            <div class="model-desc">SSL transformer · contrastive pretraining · XLSR</div>
+            <div class="model-gauge-wrap">
+              <svg viewBox="0 0 100 100" width="110" height="110">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+                <circle id="wav2vec2-gauge-arc" cx="50" cy="50" r="40" fill="none" stroke="#b45309"
+                        stroke-width="8" stroke-linecap="round"
+                        stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                        transform="rotate(-90 50 50)"
+                        style="transition:stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1),stroke 0.4s"/>
+                <text id="wav2vec2-score" x="50" y="50" text-anchor="middle" dominant-baseline="middle"
+                      font-family="Space Mono,monospace" font-size="15" font-weight="700" fill="#0f172a">--</text>
+              </svg>
+            </div>
+            <div class="model-score-label">SPOOF PROBABILITY</div>
+            <div class="prob-bar-wrap"><div class="prob-bar" id="wav2vec2-bar" style="width:0%"></div></div>
+          </div>
+
+          <div class="model-card" id="card-rawnet2">
+            <div class="model-card-accent"></div>
+            <div class="model-name">RAWNET2</div>
+            <div class="model-desc">SincConv · residual blocks · FMS · GRU</div>
+            <div class="model-gauge-wrap">
+              <svg viewBox="0 0 100 100" width="110" height="110">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+                <circle id="rawnet2-gauge-arc" cx="50" cy="50" r="40" fill="none" stroke="#b45309"
+                        stroke-width="8" stroke-linecap="round"
+                        stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                        transform="rotate(-90 50 50)"
+                        style="transition:stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1),stroke 0.4s"/>
+                <text id="rawnet2-score" x="50" y="50" text-anchor="middle" dominant-baseline="middle"
+                      font-family="Space Mono,monospace" font-size="15" font-weight="700" fill="#0f172a">--</text>
+              </svg>
+            </div>
+            <div class="model-score-label">SPOOF PROBABILITY</div>
+            <div class="prob-bar-wrap"><div class="prob-bar" id="rawnet2-bar" style="width:0%"></div></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Segment strips -->
+      <div style="margin-top:24px">
+        <div class="section-label">SEGMENT ANALYSIS</div>
+        <div class="segment-section">
+          <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">
+            Spoof probability per 4-second window — colour per segment per model
+          </div>
+          <div class="seg-model-strips" id="seg-model-strips"></div>
+          <div class="seg-time-labels" id="seg-time-labels"></div>
+        </div>
+      </div>
+
+    </div><!-- /results -->
+
+    <!-- Acoustic Analysis -->
+    <div id="acoustic-panel" class="fade-section">
+      <div class="section-label">ACOUSTIC FEATURE ANALYSIS</div>
+      <div class="acoustic-grid">
+
+        <div class="acoustic-card">
+          <div class="acoustic-card-header">
+            <div class="acoustic-card-title">MFCC FINGERPRINT</div>
+            <div class="acoustic-card-sub">Physical resonance of the vocal tract encoded as 13 cepstral coefficients. Human speech shows characteristic energy decay; synthetic sources often distort coefficients C4–C7.</div>
+          </div>
+          <div class="acoustic-card-body">
+            <div class="mfcc-legend">
+              <div class="mfcc-legend-item"><div class="mfcc-legend-dot" style="background:#b45309"></div>Mean value</div>
+              <div class="mfcc-legend-item"><div class="mfcc-legend-dot" style="background:rgba(0,0,0,0.10)"></div>±1 Std dev</div>
+            </div>
+            <div class="mfcc-chart-wrap" id="mfcc-coeff-chart"></div>
+            <div class="model-insights" id="mfcc-model-insights"></div>
+          </div>
+        </div>
+
+        <div class="acoustic-card">
+          <div class="acoustic-card-header">
+            <div class="acoustic-card-title">ACOUSTIC ARTIFACTS</div>
+            <div class="acoustic-card-sub">Digital signatures left by TTS engines — spectral flatness, high-frequency anomalies, and zero-crossing irregularities not present in natural speech.</div>
+          </div>
+          <div class="acoustic-card-body">
+            <div class="artifact-meters" id="artifact-meters"></div>
+            <div class="artifact-interpretation" id="artifact-interpretation"></div>
+            <div class="model-insights" id="artifact-model-insights"></div>
+          </div>
+        </div>
+
+        <div class="acoustic-card">
+          <div class="acoustic-card-header">
+            <div class="acoustic-card-title">PROSODY ANALYSIS</div>
+            <div class="acoustic-card-sub">Natural stress and intonation patterns in genuine speech produce irregular energy envelopes and varied pauses. Synthetic speech is often unnaturally uniform.</div>
+          </div>
+          <div class="acoustic-card-body">
+            <div class="prosody-canvas-wrap">
+              <canvas id="prosody-canvas"></canvas>
+            </div>
+            <div class="pause-map-label">PAUSE MAP</div>
+            <div class="pause-map" id="pause-map"></div>
+            <div class="prosody-stats" id="prosody-stats"></div>
+            <div class="model-insights" id="prosody-model-insights"></div>
+          </div>
         </div>
 
       </div>
     </div>
 
-    <!-- Segment chart -->
-    <div style="margin-top:24px">
-      <div class="section-label">SEGMENT ANALYSIS</div>
-      <div class="segment-section">
-        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">
-          Spoof probability per 4-second window — each bar is one segment of the audio
-        </div>
-        <div class="segment-chart" id="seg-chart"></div>
+    <!-- DISABLED: Agreement matrix hidden -->
+    <div id="agreement-panel" class="fade-section" style="display:none !important">
+      <div class="section-label">SEGMENT × MODEL DECISION MATRIX</div>
+      <div class="matrix-table-wrap">
+        <table class="matrix-table" id="agreement-table">
+          <thead>
+            <tr>
+              <th>Segment</th>
+              <th>AASIST3</th>
+              <th>WAV2VEC2</th>
+              <th>RAWNET2</th>
+              <th>Ensemble</th>
+            </tr>
+          </thead>
+          <tbody id="agreement-tbody"></tbody>
+        </table>
       </div>
     </div>
 
-  </div><!-- /results -->
+    <!-- Metadata -->
+    <div id="meta-panel" class="fade-section">
+      <div class="section-label">METADATA ANALYSIS</div>
+      <div class="meta-card" id="meta-card"></div>
+    </div>
 
-</main>
+    <!-- Raw JSON -->
+    <div id="raw-json-panel" class="fade-section">
+      <div class="section-label">RAW API RESPONSE</div>
+      <div class="raw-json-wrap">
+        <div class="raw-json-toolbar">
+          <span>application/json</span>
+          <button class="raw-json-copy" id="raw-json-copy-btn" onclick="copyRawJson()">COPY</button>
+        </div>
+        <pre id="raw-json-pre"></pre>
+      </div>
+    </div>
 
-<footer>
-  <span>VARE · VOICE AUTHENTICITY RISK ENGINE</span>
-  <span id="footer-device">--</span>
-</footer>
+  </div><!-- /content-area -->
+</div><!-- /main-area -->
+</div><!-- /app-layout -->
 
 <script>
-  // ── File selection ──────────────────────────────
-  const fileInput  = document.getElementById('file-input');
-  const dropZone   = document.getElementById('drop-zone');
-  const fileNameEl = document.getElementById('file-name');
-  const analyzeBtn = document.getElementById('analyze-btn');
-  let selectedFile = null;
+  function setActive(el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  const fileInput   = document.getElementById('file-input');
+  const dropZone    = document.getElementById('drop-zone');
+  const fileNameEl  = document.getElementById('file-name');
+  const analyzeBtn  = document.getElementById('analyze-btn');
+  const playBtn     = document.getElementById('play-btn');
+  const audioPlayer = document.getElementById('audio-player');
+  let selectedFile   = null;
+  let audioObjectURL = null;
+
+  function togglePlay() {
+    if (!audioPlayer.src || audioPlayer.src === window.location.href) return;
+    if (audioPlayer.paused) { audioPlayer.play(); } else { audioPlayer.pause(); }
+  }
+
+  audioPlayer.addEventListener('play',  () => { playBtn.textContent = '❙❙'; playBtn.classList.add('playing'); });
+  audioPlayer.addEventListener('pause', () => { playBtn.textContent = '▶';  playBtn.classList.remove('playing'); });
+  audioPlayer.addEventListener('ended', () => { playBtn.textContent = '▶';  playBtn.classList.remove('playing'); });
 
   fileInput.addEventListener('change', e => selectFile(e.target.files[0]));
-
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
+    e.preventDefault(); dropZone.classList.remove('drag-over');
     if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
   });
 
-  function selectFile(f) {
-    selectedFile = f;
-    fileNameEl.textContent = '▸ ' + f.name + '  (' + (f.size / 1024).toFixed(1) + ' KB)';
-    analyzeBtn.classList.add('visible');
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('error-box').style.display = 'none';
+  function showModal(title, body) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = body;
+    document.getElementById('limit-overlay').classList.add('visible');
+  }
+  function closeModal(e) {
+    if (e && e.target !== document.getElementById('limit-overlay')) return;
+    document.getElementById('limit-overlay').classList.remove('visible');
   }
 
-  // ── Health check on load ────────────────────────
+  function selectFile(f) {
+    audioPlayer.pause();
+    const results = document.getElementById('results');
+    results.style.display = 'none'; results.classList.remove('visible');
+    document.getElementById('error-box').style.display = 'none';
+
+    ['preprocessing-panel','acoustic-panel','agreement-panel','meta-panel','raw-json-panel'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.display = 'none'; el.classList.remove('visible');
+    });
+    document.getElementById('meta-card').innerHTML = '';
+    document.getElementById('raw-json-pre').innerHTML = '';
+
+    ['waveform-canvas','db-canvas','mel-canvas','mfcc-canvas','psd-canvas'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    });
+
+    const ph = document.getElementById('playhead');
+    if (ph) { ph.style.display = 'none'; ph.style.left = '0px'; }
+    const strips   = document.getElementById('seg-model-strips');  if (strips)   strips.innerHTML = '';
+    const timeLbls = document.getElementById('seg-time-labels');   if (timeLbls) timeLbls.innerHTML = '';
+    const agreeEl  = document.getElementById('agreement-indicator'); if (agreeEl)  agreeEl.innerHTML = '';
+    _waveformPre = null;
+
+    const maxBytes = 25 * 1024 * 1024;
+    if (f.size > maxBytes) {
+      showModal('FILE TOO LARGE',
+        'Your file <strong>' + f.name + '</strong> is <strong>' + (f.size/(1024*1024)).toFixed(1) + ' MB</strong>. ' +
+        'Please use a file under 25 MB.');
+      fileNameEl.textContent = '';
+      document.getElementById('btn-row').classList.remove('visible');
+      audioPlayer.pause();
+      if (audioObjectURL) { URL.revokeObjectURL(audioObjectURL); audioObjectURL = null; }
+      audioPlayer.src = ''; playBtn.disabled = true; selectedFile = null;
+      return;
+    }
+
+    selectedFile = f;
+    const sizeStr = f.size >= 1024*1024
+      ? (f.size/(1024*1024)).toFixed(1)+' MB'
+      : (f.size/1024).toFixed(1)+' KB';
+    fileNameEl.textContent = '▸ ' + f.name + '  (' + sizeStr + ')';
+    document.getElementById('topbar-file').textContent = '▸ ' + f.name;
+
+    if (audioObjectURL) URL.revokeObjectURL(audioObjectURL);
+    audioObjectURL = URL.createObjectURL(f);
+    audioPlayer.src = audioObjectURL;
+    audioPlayer.load();
+    playBtn.disabled = false; playBtn.textContent = '▶'; playBtn.classList.remove('playing');
+    document.getElementById('btn-row').classList.add('visible');
+  }
+
   fetch('/health').then(r => r.json()).then(d => {
     document.getElementById('footer-device').textContent = 'DEVICE: ' + d.device.toUpperCase();
     const active = Object.values(d.models_loaded).filter(Boolean).length;
     document.getElementById('status-text').textContent = active + '/3 MODELS READY';
   }).catch(() => {});
 
-  // ── Analysis ────────────────────────────────────
   async function runAnalysis() {
     if (!selectedFile) return;
-
     const loading = document.getElementById('loading');
     const results = document.getElementById('results');
     const errBox  = document.getElementById('error-box');
 
     analyzeBtn.disabled = true;
-    results.style.display = 'none';
-    errBox.style.display  = 'none';
+    results.style.display = 'none'; errBox.style.display = 'none';
     loading.style.display = 'block';
 
-    const steps = [
-      'LOADING AUDIO FILE',
-      'PREPROCESSING SEGMENTS',
-      'RUNNING AASIST3',
-      'RUNNING WAV2VEC2',
-      'RUNNING RAWNET2',
-      'AGGREGATING ENSEMBLE'
-    ];
+    const steps = ['LOADING AUDIO FILE','PREPROCESSING SEGMENTS','RUNNING AASIST3','RUNNING WAV2VEC2','RUNNING RAWNET2','AGGREGATING ENSEMBLE'];
     let si = 0;
     const stepTimer = setInterval(() => {
-      document.getElementById('loading-text').textContent = steps[si % steps.length];
-      si++;
+      document.getElementById('loading-text').textContent = steps[si % steps.length]; si++;
     }, 1800);
 
     try {
-      const form = new FormData();
-      form.append('file', selectedFile);
-
+      const form = new FormData(); form.append('file', selectedFile);
       const res  = await fetch('/analyze', { method: 'POST', body: form });
       const data = await res.json();
-
-      clearInterval(stepTimer);
-      loading.style.display = 'none';
-      analyzeBtn.disabled = false;
+      clearInterval(stepTimer); loading.style.display = 'none'; analyzeBtn.disabled = false;
 
       if (data.status === 'error') {
-        errBox.textContent = '⚠ ERROR: ' + data.message;
-        errBox.style.display = 'block';
+        if (data.message && data.message.toLowerCase().includes('too long')) {
+          showModal('AUDIO TOO LONG', data.message + ' Please trim your audio to under 5 minutes before submitting.');
+        } else {
+          errBox.textContent = '⚠ ERROR: ' + data.message; errBox.style.display = 'block';
+        }
         return;
       }
-
       renderResults(data);
-
     } catch(e) {
-      clearInterval(stepTimer);
-      loading.style.display = 'none';
-      analyzeBtn.disabled = false;
-      errBox.textContent = '⚠ REQUEST FAILED: ' + e.message;
-      errBox.style.display = 'block';
+      clearInterval(stepTimer); loading.style.display = 'none'; analyzeBtn.disabled = false;
+      errBox.textContent = '⚠ REQUEST FAILED: ' + e.message; errBox.style.display = 'block';
     }
   }
 
-  // ── Render ──────────────────────────────────────
   function scoreColor(score) {
-    if (score <= 30) return '#22c55e';
-    if (score <= 60) return '#f59e0b';
-    return '#ef4444';
+    if (score <= 30) return '#16a34a';
+    if (score <= 60) return '#d97706';
+    return '#dc2626';
   }
 
   function renderResults(d) {
+    renderPreprocessing(d.preprocessing || null);
+
     const results = document.getElementById('results');
     results.style.display = 'block';
+    setTimeout(() => results.classList.add('visible'), 200);
 
-    // Verdict
-    const sc = d.ensemble_score;
+    const sc  = d.ensemble_score;
     const col = scoreColor(sc);
 
     const scoreEl = document.getElementById('v-score');
@@ -769,83 +1360,624 @@
     };
     document.getElementById('v-detail').textContent = descriptions[d.risk_level];
 
-    // Gauge arc
     const arc = document.getElementById('gauge-arc');
-    const pct = sc / 100;
-    const dashOffset = 157 - (157 * pct);
-    arc.style.strokeDashoffset = dashOffset;
+    arc.style.strokeDashoffset = 157 - (157 * sc / 100);
     arc.style.stroke = col;
     document.getElementById('gauge-pct').textContent = sc + '%';
 
-    // Stats
     document.getElementById('s-dur').innerHTML  = d.duration_sec + '<span class="stat-unit"> s</span>';
     document.getElementById('s-seg').textContent = d.n_segments;
     document.getElementById('s-conf').innerHTML  = Math.round(d.model_confidence * 100) + '<span class="stat-unit">%</span>';
-
     const active = Object.values(d.models).filter(m => m.available).length;
-    document.getElementById('s-mods').innerHTML = active + '<span class="stat-unit">/3</span>';
+    document.getElementById('s-mods').innerHTML  = active + '<span class="stat-unit">/3</span>';
 
-    // Model cards
     renderModel('aasist3', d.models.aasist3);
     renderModel('wav2vec2', d.models.wav2vec2);
     renderModel('rawnet2',  d.models.rawnet2);
 
-    // Segment chart — use AASIST3 segments as primary, fallback to wav2vec2
-    const segs = d.models.aasist3.segment_scores.length
-      ? d.models.aasist3.segment_scores
-      : d.models.wav2vec2.segment_scores;
-    renderSegments(segs);
+    renderAgreementIndicator(d);
+    renderPerModelSegments(d);
+    setTimeout(() => renderAcousticAnalysis(d), 400);
+    setTimeout(() => {
+      renderAgreementMatrix(d);
+      const ap = document.getElementById('agreement-panel');
+      if (ap.style.display !== 'none') ap.classList.add('visible');
+    }, 500);
+    setTimeout(() => renderMetaAnalysis(d.metadata_analysis), 600);
+    setTimeout(() => {
+      const rjPanel = document.getElementById('raw-json-panel');
+      const rjPre   = document.getElementById('raw-json-pre');
+      rjPre.innerHTML = highlightJson(JSON.stringify(d, null, 2));
+      rjPanel.style.display = 'block';
+      setTimeout(() => rjPanel.classList.add('visible'), 50);
+    }, 600);
+    requestAnimationFrame(() => overlayRiskOnWaveform(d));
+    setTimeout(() => { results.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
   }
 
   function renderModel(key, m) {
-    const card      = document.getElementById('card-' + key);
-    const scoreEl   = document.getElementById(key + '-score');
-    const barEl     = document.getElementById(key + '-bar');
+    const card     = document.getElementById('card-' + key);
+    const scoreEl  = document.getElementById(key + '-score');
+    const barEl    = document.getElementById(key + '-bar');
+    const gaugeArc = document.getElementById(key + '-gauge-arc');
+    const dot      = document.getElementById('dot-' + key);
+    const dotScore = document.getElementById('dot-score-' + key);
 
     if (!m.available) {
       card.classList.add('unavailable');
-      scoreEl.textContent = 'N/A';
+      if (scoreEl)  scoreEl.textContent  = 'N/A';
+      if (dot)      dot.style.background = '#cbd5e1';
+      if (dotScore) dotScore.textContent = '--';
       return;
     }
 
     card.classList.remove('unavailable');
     const sc  = m.aggregate_spoof_prob;
     const col = scoreColor(sc);
-    scoreEl.textContent = sc + '%';
-    scoreEl.style.color = col;
-    barEl.style.width   = sc + '%';
-    barEl.style.background = col;
-    barEl.style.boxShadow  = '0 0 6px ' + col;
+
+    if (scoreEl) { scoreEl.textContent = sc + '%'; scoreEl.setAttribute('fill', col); }
+    if (barEl)   { barEl.style.width = sc + '%'; barEl.style.background = col; }
+    if (gaugeArc) {
+      const circumference = 2 * Math.PI * 40;
+      gaugeArc.style.strokeDashoffset = circumference * (1 - sc / 100);
+      gaugeArc.setAttribute('stroke', col);
+    }
+    if (dot)      { dot.style.background = col; dot.classList.add('loaded'); dot.style.boxShadow = '0 0 5px ' + col + '80'; }
+    if (dotScore) { dotScore.textContent = sc + '%'; dotScore.style.color = col; }
   }
 
-  function renderSegments(segs) {
-    const chart = document.getElementById('seg-chart');
-    chart.innerHTML = '';
-    if (!segs || segs.length === 0) {
-      chart.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">No segment data</span>';
-      return;
-    }
-    segs.forEach((s, i) => {
-      const col = scoreColor(s);
-      const heightPct = Math.max(s, 2);
-      const wrap = document.createElement('div');
-      wrap.className = 'seg-bar-wrap';
+  function renderPreprocessing(pre) {
+    const panel = document.getElementById('preprocessing-panel');
+    if (!pre) { panel.classList.remove('visible'); return; }
 
-      const bar = document.createElement('div');
-      bar.className  = 'seg-bar';
-      bar.style.height     = heightPct + '%';
-      bar.style.background = col;
-      bar.style.boxShadow  = '0 0 4px ' + col;
-      bar.setAttribute('data-tip', 'Seg ' + (i+1) + ': ' + s + '%');
+    const meta = pre.audio_metadata || {};
+    document.getElementById('meta-duration').innerHTML = (meta.duration_sec || '--') + '<span class="meta-card-unit"> s</span>';
+    document.getElementById('meta-sr').innerHTML       = (meta.sample_rate ? meta.sample_rate.toLocaleString() : '--') + '<span class="meta-card-unit"> Hz</span>';
+    document.getElementById('meta-segs').textContent   = meta.num_segments  || '--';
+    document.getElementById('meta-samples').textContent = meta.total_samples ? meta.total_samples.toLocaleString() : '--';
 
-      const lbl = document.createElement('div');
-      lbl.className   = 'seg-label';
-      lbl.textContent = (i+1);
-
-      wrap.appendChild(bar);
-      wrap.appendChild(lbl);
-      chart.appendChild(wrap);
+    panel.style.display = 'block';
+    requestAnimationFrame(() => panel.classList.add('visible'));
+    requestAnimationFrame(() => {
+      drawWaveform(pre);
+      drawDbVsTime(pre);
+      drawHeatmap('mel-canvas',  'mel-placeholder',  pre.mel_spectrogram, viridisColor);
+      drawHeatmap('mfcc-canvas', 'mfcc-placeholder', pre.mfcc,            divergingColor);
+      drawPSD(pre.psd);
     });
+  }
+
+  let _waveformPre = null;
+
+  function drawWaveform(pre) {
+    _waveformPre = pre;
+    const canvas = document.getElementById('waveform-canvas');
+    const dpr    = window.devicePixelRatio || 1;
+    const w      = canvas.clientWidth;
+    const h      = canvas.clientHeight || 130;
+    canvas.width  = w * dpr; canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const waveform = pre.waveform || [];
+    const segs     = pre.segments || [];
+    if (!waveform.length) return;
+
+    const total  = pre.audio_metadata.total_samples || 1;
+    const N_BARS = 80;
+    const mid    = h / 2;
+    const max    = Math.max(...waveform.map(Math.abs)) || 1;
+
+    // Segment band backgrounds (amber tint)
+    segs.forEach((seg, i) => {
+      const x1 = (seg.start_sample / total) * w;
+      const x2 = (seg.end_sample   / total) * w;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(180,83,9,0.04)' : 'rgba(180,83,9,0.08)';
+      ctx.fillRect(x1, 0, x2 - x1, h);
+    });
+
+    // Equalizer bars (amber/orange palette)
+    const barW = w / N_BARS;
+    const gap  = Math.max(1, barW * 0.18);
+    const bw   = barW - gap;
+
+    for (let b = 0; b < N_BARS; b++) {
+      const start = Math.floor((b / N_BARS) * waveform.length);
+      const end   = Math.floor(((b + 1) / N_BARS) * waveform.length);
+      const slice = waveform.slice(start, end);
+      const amp   = slice.length ? Math.max(...slice.map(Math.abs)) : 0;
+      const barH  = Math.max(2, (amp / max) * (mid - 6));
+      const x     = b * barW + gap / 2;
+      const t     = amp / max;
+      // Gradient from amber (#b45309) to gold (#d97706) at peak
+      const r = 180, g = Math.round(83 + t * 87), bl = 9;
+
+      ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + bl + ',0.85)';
+      ctx.beginPath();
+      try { ctx.roundRect(x, mid - barH, bw, barH, 2); }
+      catch { ctx.rect(x, mid - barH, bw, barH); }
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + bl + ',0.35)';
+      ctx.beginPath();
+      try { ctx.roundRect(x, mid, bw, barH, 2); }
+      catch { ctx.rect(x, mid, bw, barH); }
+      ctx.fill();
+    }
+
+    // Segment dividers
+    segs.forEach((seg, i) => {
+      if (i === 0) return;
+      const x = (seg.start_sample / total) * w;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      ctx.strokeStyle = 'rgba(180,83,9,0.25)';
+      ctx.lineWidth   = 1; ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+    });
+
+    // Segment labels
+    const labelsEl = document.getElementById('waveform-seg-labels');
+    labelsEl.innerHTML = '';
+    segs.forEach((seg, i) => {
+      const cx  = ((seg.start_sample + seg.end_sample) / 2 / total) * 100;
+      const lbl = document.createElement('span');
+      lbl.className   = 'waveform-seg-label';
+      lbl.style.left  = cx + '%';
+      lbl.textContent = 'S' + (i + 1);
+      labelsEl.appendChild(lbl);
+    });
+
+    if (audioPlayer.src && audioPlayer.src !== window.location.href) {
+      document.getElementById('playhead').style.display = 'block';
+    }
+  }
+
+  const waveformWrap = document.getElementById('waveform-wrap');
+  audioPlayer.addEventListener('timeupdate', () => {
+    if (!audioPlayer.duration) return;
+    const pct  = audioPlayer.currentTime / audioPlayer.duration;
+    const phEl = document.getElementById('playhead');
+    phEl.style.left    = (pct * waveformWrap.clientWidth) + 'px';
+    phEl.style.display = 'block';
+  });
+  audioPlayer.addEventListener('ended', () => { document.getElementById('playhead').style.left = '0px'; });
+  waveformWrap.addEventListener('click', e => {
+    if (!audioPlayer.duration) return;
+    const rect = waveformWrap.getBoundingClientRect();
+    audioPlayer.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * audioPlayer.duration;
+  });
+
+  function drawDbVsTime(pre) {
+    const canvas   = document.getElementById('db-canvas');
+    const waveform = pre.waveform || [];
+    if (!waveform.length) { canvas.style.display = 'none'; return; }
+    canvas.style.display = 'block';
+
+    const dpr = window.devicePixelRatio || 1;
+    const W   = canvas.clientWidth;
+    const H   = canvas.clientHeight || 70;
+    canvas.width  = W * dpr; canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const BLOCKS  = Math.min(400, waveform.length);
+    const blkSize = Math.max(1, Math.floor(waveform.length / BLOCKS));
+    const dbs     = [];
+    for (let b = 0; b < BLOCKS; b++) {
+      const slice = waveform.slice(b * blkSize, b * blkSize + blkSize);
+      const rms   = Math.sqrt(slice.reduce((s, v) => s + v * v, 0) / slice.length);
+      dbs.push(20 * Math.log10(Math.max(rms, 1e-9)));
+    }
+
+    const PAD_L = 36, PAD_R = 8, PAD_T = 6, PAD_B = 18;
+    const cW = W - PAD_L - PAD_R; const cH = H - PAD_T - PAD_B;
+    const minDb = Math.min(...dbs); const maxDb = Math.max(...dbs); const range = maxDb - minDb || 1;
+    const xOf = i  => PAD_L + (i / (dbs.length - 1)) * cW;
+    const yOf = db => PAD_T + cH - ((db - minDb) / range) * cH;
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      const y = PAD_T + (i / 4) * cH;
+      ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + cW, y); ctx.stroke();
+    }
+    if (minDb < 0 && maxDb > 0) {
+      const y0 = yOf(0);
+      ctx.beginPath(); ctx.moveTo(PAD_L, y0); ctx.lineTo(PAD_L + cW, y0);
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // Amber fill
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), PAD_T + cH);
+    dbs.forEach((db, i) => ctx.lineTo(xOf(i), yOf(db)));
+    ctx.lineTo(xOf(dbs.length - 1), PAD_T + cH);
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + cH);
+    fillGrad.addColorStop(0, 'rgba(180,83,9,0.35)');
+    fillGrad.addColorStop(1, 'rgba(180,83,9,0.03)');
+    ctx.fillStyle = fillGrad; ctx.fill();
+
+    ctx.beginPath();
+    dbs.forEach((db, i) => { i === 0 ? ctx.moveTo(xOf(i), yOf(db)) : ctx.lineTo(xOf(i), yOf(db)); });
+    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+    [minDb, (minDb + maxDb) / 2, maxDb].forEach(db => { ctx.fillText(db.toFixed(0) + 'dB', PAD_L - 4, yOf(db) + 3); });
+
+    const dur = (pre.audio_metadata || {}).duration_sec || 0;
+    if (dur > 0) {
+      ctx.textAlign = 'center'; ctx.fillStyle = '#94a3b8';
+      const ticks = Math.min(8, Math.floor(dur));
+      for (let t = 0; t <= ticks; t++) {
+        ctx.fillText(((t / ticks) * dur).toFixed(0) + 's', PAD_L + (t / ticks) * cW, H - 3);
+      }
+    }
+  }
+
+  function viridisColor(t) {
+    const stops = [[13,8,135],[126,3,168],[248,149,64],[240,249,33]];
+    t = Math.max(0, Math.min(1, t));
+    const idx = t * (stops.length - 1); const lo = Math.floor(idx); const hi = Math.min(lo+1,stops.length-1); const f = idx-lo;
+    return `rgb(${Math.round(stops[lo][0]+f*(stops[hi][0]-stops[lo][0]))},${Math.round(stops[lo][1]+f*(stops[hi][1]-stops[lo][1]))},${Math.round(stops[lo][2]+f*(stops[hi][2]-stops[lo][2]))})`;
+  }
+  function divergingColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    if (t < 0.5) { const f=t*2; return `rgb(${Math.round(33+f*(26-33))},${Math.round(102+f*(26-102))},${Math.round(172+f*(46-172))})`; }
+    else { const f=(t-0.5)*2; return `rgb(${Math.round(26+f*(178-26))},${Math.round(26+f*(24-26))},${Math.round(46+f*(43-46))})`; }
+  }
+
+  function drawHeatmap(canvasId, placeholderId, data2d, colorFn) {
+    const placeholder = document.getElementById(placeholderId);
+    const canvas      = document.getElementById(canvasId);
+    if (!data2d || !data2d.length || !data2d[0].length) {
+      canvas.style.display = 'none'; placeholder.style.display = 'flex'; return;
+    }
+    canvas.style.display = 'block'; placeholder.style.display = 'none';
+    const nRows = data2d.length; const nCols = data2d[0].length;
+    let gMin = Infinity, gMax = -Infinity;
+    data2d.forEach(row => row.forEach(v => { if (v<gMin) gMin=v; if (v>gMax) gMax=v; }));
+    const range = gMax - gMin || 1;
+    const dpr = window.devicePixelRatio || 1; const w = canvas.clientWidth; const h = canvas.clientHeight || 180;
+    canvas.width = w*dpr; canvas.height = h*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+    const cellW = w/nCols; const cellH = h/nRows;
+    for (let row=0; row<nRows; row++) for (let col=0; col<nCols; col++) {
+      ctx.fillStyle = colorFn((data2d[row][col]-gMin)/range);
+      ctx.fillRect(col*cellW, (nRows-1-row)*cellH, cellW+0.5, cellH+0.5);
+    }
+  }
+
+  function drawPSD(psdData) {
+    const placeholder = document.getElementById('psd-placeholder');
+    const canvas      = document.getElementById('psd-canvas');
+    if (!psdData || !psdData.freqs || !psdData.power || !psdData.freqs.length) {
+      canvas.style.display = 'none'; placeholder.style.display = 'flex'; return;
+    }
+    canvas.style.display = 'block'; placeholder.style.display = 'none';
+
+    const dpr = window.devicePixelRatio || 1; const W = canvas.clientWidth; const H = canvas.clientHeight || 160;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+
+    const PAD_L=40, PAD_R=12, PAD_T=16, PAD_B=28;
+    const cW=W-PAD_L-PAD_R; const cH=H-PAD_T-PAD_B; const MAX_FREQ=8000;
+    const pairs = psdData.freqs.map((f,i)=>[f,psdData.power[i]]).filter(([f])=>f<=MAX_FREQ);
+    if (!pairs.length) return;
+    const logPow = pairs.map(([,p])=>Math.log10(Math.max(p,1e-10)));
+    const minLog=Math.min(...logPow); const maxLog=Math.max(...logPow); const logRange=maxLog-minLog||1;
+    const xOf = f  => PAD_L+(f/MAX_FREQ)*cW;
+    const yOf = lv => PAD_T+cH-((lv-minLog)/logRange)*cH;
+
+    ctx.strokeStyle='rgba(0,0,0,0.05)'; ctx.lineWidth=1;
+    for(let i=1;i<8;i++){const x=xOf(i*1000);ctx.beginPath();ctx.moveTo(x,PAD_T);ctx.lineTo(x,PAD_T+cH);ctx.stroke();}
+    for(let i=1;i<4;i++){const y=PAD_T+(i/4)*cH;ctx.beginPath();ctx.moveTo(PAD_L,y);ctx.lineTo(PAD_L+cW,y);ctx.stroke();}
+
+    const refs=[{hz:300,label:'F0'},{hz:1000,label:'F1'},{hz:3000,label:'F2–F3'}];
+    ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+    ctx.fillStyle='#64748b'; ctx.font='10px monospace'; ctx.textAlign='center';
+    refs.forEach(({hz,label})=>{
+      const x=xOf(hz); ctx.beginPath();ctx.moveTo(x,PAD_T+14);ctx.lineTo(x,PAD_T+cH);ctx.stroke();
+      ctx.fillText(label,x,PAD_T+12);
+    });
+    ctx.setLineDash([]);
+
+    // Amber fill
+    ctx.beginPath(); ctx.moveTo(xOf(pairs[0][0]),PAD_T+cH);
+    pairs.forEach(([f,],i)=>ctx.lineTo(xOf(f),yOf(logPow[i])));
+    ctx.lineTo(xOf(pairs[pairs.length-1][0]),PAD_T+cH); ctx.closePath();
+    ctx.fillStyle='rgba(180,83,9,0.10)'; ctx.fill();
+
+    ctx.beginPath();
+    pairs.forEach(([f,],i)=>{i===0?ctx.moveTo(xOf(f),yOf(logPow[i])):ctx.lineTo(xOf(f),yOf(logPow[i]));});
+    ctx.strokeStyle='#b45309'; ctx.lineWidth=1.5; ctx.stroke();
+
+    ctx.fillStyle='#94a3b8'; ctx.font='10px monospace'; ctx.textAlign='center';
+    [0,1,2,3,4,5,6,7,8].forEach(k=>ctx.fillText(k===0?'0':k+'k',xOf(k*1000),PAD_T+cH+18));
+
+    ctx.save(); ctx.translate(12,PAD_T+cH/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.fillText('Power (dB)',0,0); ctx.restore();
+  }
+
+  function cellBg(score) {
+    if (score===null||score===undefined) return '';
+    if (score<30)  return 'rgba(22,163,74,0.12)';
+    if (score<60)  return 'rgba(217,119,6,0.12)';
+    return 'rgba(220,38,38,0.12)';
+  }
+
+  function renderAgreementMatrix(d) {
+    const panel = document.getElementById('agreement-panel');
+    const tbody = document.getElementById('agreement-tbody');
+    const a3=d.models.aasist3; const w2=d.models.wav2vec2; const rn=d.models.rawnet2;
+    const nSegs = Math.max(a3.segment_scores.length, w2.segment_scores.length, rn.segment_scores.length);
+    if (!nSegs) { panel.style.display='none'; return; }
+
+    tbody.innerHTML='';
+    for (let i=0;i<nSegs;i++) {
+      const sa=a3.available?a3.segment_scores[i]:null;
+      const sw=w2.available?w2.segment_scores[i]:null;
+      const sr=rn.available?rn.segment_scores[i]:null;
+      const parts=[];
+      if(sa!=null)parts.push([sa,20]); if(sw!=null)parts.push([sw,45]); if(sr!=null)parts.push([sr,35]);
+      const totalW=parts.reduce((acc,[,w])=>acc+w,0);
+      const ens=totalW?parts.reduce((acc,[s,w])=>acc+s*w,0)/totalW:null;
+      const vals=parts.map(([s])=>s).filter(v=>v!=null);
+      const disagree=vals.some(v=>v<30)&&vals.some(v=>v>60);
+      const fmt=v=>v!=null?v.toFixed(1)+'%':'—';
+      const td=val=>`<td style="background:${cellBg(val)}">${fmt(val)}</td>`;
+      const tr=document.createElement('tr');
+      if(disagree)tr.classList.add('disagree');
+      tr.innerHTML=`<td>S${i+1}</td>${td(sa)}${td(sw)}${td(sr)}${td(ens)}`;
+      tbody.appendChild(tr);
+    }
+    panel.style.display='block';
+  }
+
+  function overlayRiskOnWaveform(d) {
+    const canvas=document.getElementById('waveform-canvas');
+    if(!canvas||!d.preprocessing)return;
+    const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1;
+    const W=canvas.width/dpr; const H=canvas.height/dpr;
+    const total=d.preprocessing.audio_metadata.total_samples||1;
+    const segs=d.preprocessing.segments||[];
+    const a3=d.models.aasist3; const w2=d.models.wav2vec2; const rn=d.models.rawnet2;
+    segs.forEach((seg,i)=>{
+      const sa=a3.available?a3.segment_scores[i]:null;
+      const sw=w2.available?w2.segment_scores[i]:null;
+      const sr=rn.available?rn.segment_scores[i]:null;
+      const parts=[];
+      if(sa!=null)parts.push([sa,20]); if(sw!=null)parts.push([sw,45]); if(sr!=null)parts.push([sr,35]);
+      const totalW=parts.reduce((acc,[,w])=>acc+w,0); if(!totalW)return;
+      const ens=parts.reduce((acc,[s,w])=>acc+s*w,0)/totalW;
+      const x1=(seg.start_sample/total)*W; const x2=(seg.end_sample/total)*W;
+      if(ens<30)ctx.fillStyle='rgba(22,163,74,0.10)';
+      else if(ens<60)ctx.fillStyle='rgba(217,119,6,0.12)';
+      else ctx.fillStyle='rgba(220,38,38,0.16)';
+      ctx.fillRect(x1,0,x2-x1,H);
+    });
+  }
+
+  function renderMetaAnalysis(meta) {
+    const panel=document.getElementById('meta-panel');
+    const card =document.getElementById('meta-card');
+    if(!meta){
+      card.innerHTML='<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">No metadata returned by server.</span>';
+      panel.style.display='block'; setTimeout(()=>panel.classList.add('visible'),50); return;
+    }
+    let html='';
+    if(meta.flag_raised){
+      html+='<div class="meta-indicator flagged"></div><div class="meta-body">';
+      html+='<div class="meta-status flagged">AI TOOL DETECTED</div>';
+      html+='<div class="meta-reason">'+escHtml(meta.reason)+'</div><div class="meta-fields">';
+      if(meta.matched_field)html+='<div class="meta-field-pill"><span class="pill-key">field</span><span class="pill-val">'+escHtml(meta.matched_field)+'</span></div>';
+      if(meta.matched_value)html+='<div class="meta-field-pill"><span class="pill-key">value</span><span class="pill-val">'+escHtml(meta.matched_value)+'</span></div>';
+      html+='</div></div>';
+    }else{
+      html+='<div class="meta-indicator clean"></div><div class="meta-body">';
+      html+='<div class="meta-status clean">NO FLAG RAISED</div>';
+      html+='<div class="meta-no-flag">No known AI tool signatures found in file tags or filename.</div></div>';
+    }
+    card.innerHTML=html; panel.style.display='block'; setTimeout(()=>panel.classList.add('visible'),50);
+  }
+
+  function escHtml(str){
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function highlightJson(json){
+    return json.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+\.?\d*([eE][+-]?\d+)?)/g,
+      function(match){
+        if(/^"/.test(match)){if(/:$/.test(match))return'<span class="json-key">'+match+'</span>';return'<span class="json-str">'+match+'</span>';}
+        if(/true|false/.test(match))return'<span class="json-bool">'+match+'</span>';
+        if(/null/.test(match))return'<span class="json-null">'+match+'</span>';
+        return'<span class="json-num">'+match+'</span>';
+      }
+    );
+  }
+
+  function copyRawJson(){
+    const text=document.getElementById('raw-json-pre').textContent;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn=document.getElementById('raw-json-copy-btn');
+      btn.textContent='COPIED'; btn.classList.add('copied');
+      setTimeout(()=>{btn.textContent='COPY';btn.classList.remove('copied');},2000);
+    });
+  }
+
+  function renderPerModelSegments(d){
+    const container=document.getElementById('seg-model-strips');
+    const timeLabels=document.getElementById('seg-time-labels');
+    container.innerHTML=''; timeLabels.innerHTML='';
+    const modelDefs=[{key:'aasist3',label:'AASIST3'},{key:'wav2vec2',label:'WAV2VEC2'},{key:'rawnet2',label:'RAWNET2'}];
+    const nSegs=Math.max(...modelDefs.map(m=>(d.models[m.key].segment_scores||[]).length));
+    modelDefs.forEach(({key,label})=>{
+      const model=d.models[key];
+      const row=document.createElement('div'); row.className='seg-model-row';
+      const lbl=document.createElement('div'); lbl.className='seg-model-label'+(model.available?'':' unavailable'); lbl.textContent=label;
+      row.appendChild(lbl);
+      if(!model.available){
+        const ua=document.createElement('div'); ua.className='seg-unavailable-row'; ua.textContent='model not loaded';
+        row.appendChild(ua); container.appendChild(row); return;
+      }
+      const blocks=document.createElement('div'); blocks.className='seg-blocks';
+      const segs=model.segment_scores||[]; const count=Math.max(segs.length,nSegs);
+      for(let i=0;i<count;i++){
+        const s=segs[i]!=null?segs[i]:0; const col=scoreColor(s);
+        const blk=document.createElement('div'); blk.className='seg-block';
+        blk.style.background=col; blk.style.boxShadow='0 0 4px '+col+'66';
+        blk.setAttribute('data-tip','S'+(i+1)+' · '+s.toFixed(1)+'%');
+        blocks.appendChild(blk);
+      }
+      row.appendChild(blocks); container.appendChild(row);
+    });
+    const dur=d.duration_sec||0;
+    for(let i=0;i<nSegs;i++){
+      const lbl=document.createElement('div'); lbl.className='seg-time-label';
+      const t=dur>0?((i/nSegs)*dur).toFixed(0)+'s':(i+1);
+      lbl.textContent=(nSegs<=12||i%2===0)?t:''; timeLabels.appendChild(lbl);
+    }
+  }
+
+  function renderAcousticAnalysis(d){
+    const pre=d.preprocessing; const panel=document.getElementById('acoustic-panel');
+    if(!pre||!pre.mfcc_analysis){panel.style.display='none';return;}
+    const ma=pre.mfcc_analysis; const aa=pre.artifact_analysis||{}; const pa=pre.prosody_analysis||{};
+    const models=d.models;
+    const sc=key=>models[key].available?models[key].aggregate_spoof_prob:null;
+    const scCol=v=>v==null?'var(--muted)':scoreColor(v);
+    const scStr=v=>v==null?'N/A':v.toFixed(1)+'%';
+
+    // MFCC
+    const coeffChart=document.getElementById('mfcc-coeff-chart'); coeffChart.innerHTML='';
+    const means=ma.mean||[]; const stds=ma.std||[]; const absMax=Math.max(...means.map(Math.abs),1);
+    means.forEach((mean,i)=>{
+      const std=stds[i]||0; const pct=(mean/absMax)*50+50; const stdPct=(std/absMax)*50;
+      const row=document.createElement('div'); row.className='mfcc-coeff-row';
+      const lbl=document.createElement('div'); lbl.className='mfcc-coeff-label'; lbl.textContent='C'+(i+1);
+      const track=document.createElement('div'); track.className='mfcc-bar-track';
+      const fill=document.createElement('div'); fill.className='mfcc-bar-fill';
+      const barW=Math.abs(pct-50);
+      fill.style.width=barW+'%'; fill.style.left=mean>=0?'50%':(50-barW)+'%';
+      fill.style.background=mean>=0?'#b45309':'#0891b2';
+      const stdBar=document.createElement('div'); stdBar.className='mfcc-bar-std';
+      stdBar.style.width=Math.min(stdPct*2,50)+'%'; stdBar.style.left=Math.max(0,pct-stdPct)+'%';
+      track.appendChild(fill); track.appendChild(stdBar); row.appendChild(lbl); row.appendChild(track); coeffChart.appendChild(row);
+    });
+
+    const a3sc=sc('aasist3'),w2sc=sc('wav2vec2'),rnsc=sc('rawnet2');
+    document.getElementById('mfcc-model-insights').innerHTML=`
+      <div class="model-insight-row"><span class="insight-model-tag">AASIST3</span><span class="insight-text">Graph attention over spectro-temporal MFCC dynamics — sensitive to C1 energy drop and C4–C7 deviations from natural formant patterns.</span><span class="insight-score" style="color:${scCol(a3sc)}">${scStr(a3sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag w2v">WAV2VEC2</span><span class="insight-text">SSL transformer learns MFCC-like representations implicitly via contrastive pretraining — unusually smooth delta-MFCC is a strong synthetic indicator.</span><span class="insight-score" style="color:${scCol(w2sc)}">${scStr(w2sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag rn">RAWNET2</span><span class="insight-text">Operates on raw signal via SincConv — MFCC variance in C1 (energy) correlates with codec-level artifacts RawNet2 is most sensitive to.</span><span class="insight-score" style="color:${scCol(rnsc)}">${scStr(rnsc)}</span></div>`;
+
+    // Artifacts
+    const flatness=aa.spectral_flatness||0; const hfRatio=aa.hf_energy_ratio||0; const zcrStd=aa.zcr_std||0;
+    const flatPct=Math.min(flatness*400,100); const hfPct=Math.min(hfRatio*1000,100); const zcrPct=Math.min(zcrStd*5000,100);
+    const flatCol=flatPct>60?'var(--high)':flatPct>35?'var(--medium)':'var(--low)';
+    const hfCol=hfPct>50?'var(--high)':hfPct>25?'var(--medium)':'var(--low)';
+    const zcrCol=zcrPct>60?'var(--low)':zcrPct>30?'var(--medium)':'var(--high)';
+
+    document.getElementById('artifact-meters').innerHTML=[
+      {label:'SPECTRAL FLATNESS',val:flatness.toFixed(4),pct:flatPct,col:flatCol,tip:'Ratio of geometric to arithmetic mean of PSD. Near 0 = pure tone; near 1 = white noise.'},
+      {label:'HIGH-FREQ ENERGY (>4kHz)',val:(hfRatio*100).toFixed(2)+'%',pct:hfPct,col:hfCol,tip:'Fraction of spectral energy above 4 kHz. TTS vocoders often produce abnormal HF residuals.'},
+      {label:'ZCR VARIABILITY (STD)',val:zcrStd.toFixed(5),pct:zcrPct,col:zcrCol,tip:'Standard deviation of zero-crossing rate. Low variability = unnaturally regular — a TTS signature.'},
+    ].map(({label,val,pct,col,tip})=>`
+      <div class="artifact-meter-row" title="${tip}">
+        <div class="artifact-meter-header"><span class="artifact-meter-name">${label}</span><span class="artifact-meter-value" style="color:${col}">${val}</span></div>
+        <div class="artifact-meter-track"><div class="artifact-meter-fill" style="width:${pct}%;background:${col}"></div></div>
+      </div>`).join('');
+
+    const flags=[];
+    if(flatPct>60)flags.push('<b>High spectral flatness</b> — unusual for natural voice');
+    if(hfPct>50) flags.push('<b>Elevated high-frequency energy</b> — common TTS vocoder artifact');
+    if(zcrPct<30)flags.push('<b>Very low ZCR variability</b> — signal is unnaturally regular');
+    document.getElementById('artifact-interpretation').innerHTML=flags.length?flags.join(' · '):'No strong acoustic artifact signatures detected in this signal.';
+
+    document.getElementById('artifact-model-insights').innerHTML=`
+      <div class="model-insight-row"><span class="insight-model-tag">AASIST3</span><span class="insight-text">Spectro-temporal graph attention — most sensitive to spectral flatness anomalies and formant irregularities from neural vocoders.</span><span class="insight-score" style="color:${scCol(a3sc)}">${scStr(a3sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag w2v">WAV2VEC2</span><span class="insight-text">XLSR pretraining encodes VQ-codebook quantisation artifacts — elevated HF energy is a key discriminative feature for this model.</span><span class="insight-score" style="color:${scCol(w2sc)}">${scStr(w2sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag rn">RAWNET2</span><span class="insight-text">SincConv learnable band-pass filters directly capture signal-level artifacts — ZCR regularity and codec fingerprints are primary signals.</span><span class="insight-score" style="color:${scCol(rnsc)}">${scStr(rnsc)}</span></div>`;
+
+    // Prosody
+    drawProsodyCanvas(pa);
+    const pauseMap=document.getElementById('pause-map'); pauseMap.innerHTML='';
+    const dur=(pre.audio_metadata||{}).duration_sec||1;
+    (pa.pause_segments||[]).forEach(p=>{
+      const seg=document.createElement('div'); seg.className='pause-seg';
+      seg.style.left=(p.start_sec/dur*100)+'%'; seg.style.width=((p.end_sec-p.start_sec)/dur*100)+'%';
+      seg.title=p.duration_sec.toFixed(2)+'s pause'; pauseMap.appendChild(seg);
+    });
+
+    const cvEnergy=pa.energy_std&&pa.energy_mean?(pa.energy_std/pa.energy_mean*100).toFixed(1):'—';
+    document.getElementById('prosody-stats').innerHTML=`
+      <div class="prosody-stat"><div class="prosody-stat-label">ENERGY CV</div><div class="prosody-stat-value">${cvEnergy}<span class="prosody-stat-unit">%</span></div></div>
+      <div class="prosody-stat"><div class="prosody-stat-label">PAUSE COUNT</div><div class="prosody-stat-value">${pa.pause_count??'—'}</div></div>
+      <div class="prosody-stat"><div class="prosody-stat-label">AVG PAUSE</div><div class="prosody-stat-value">${pa.avg_pause_dur??'—'}<span class="prosody-stat-unit"> s</span></div></div>`;
+
+    const cvNum=parseFloat(cvEnergy);
+    const cvNote=isNaN(cvNum)?''
+      :cvNum>60?'High energy variability — consistent with natural speech dynamics.'
+      :cvNum>35?'Moderate energy variability — borderline natural/synthetic range.'
+      :'Low energy variability — unnaturally uniform, consistent with TTS synthesis.';
+
+    document.getElementById('prosody-model-insights').innerHTML=`
+      <div class="model-insight-row" style="flex-direction:column;gap:4px"><div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:4px">${cvNote}</div></div>
+      <div class="model-insight-row"><span class="insight-model-tag">AASIST3</span><span class="insight-text">Graph attention networks model cross-frame dependencies — long-range prosody patterns (stress, rhythm) directly influence spoof probability.</span><span class="insight-score" style="color:${scCol(a3sc)}">${scStr(a3sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag w2v">WAV2VEC2</span><span class="insight-text">Pretrained on multilingual speech with rich prosody — highest sensitivity to unnatural intonation contours and scripted stress patterns.</span><span class="insight-score" style="color:${scCol(w2sc)}">${scStr(w2sc)}</span></div>
+      <div class="model-insight-row"><span class="insight-model-tag rn">RAWNET2</span><span class="insight-text">Limited prosody modelling — GRU sequence layer captures some temporal dynamics but primary signal is at the codec/vocoder level, not prosodic.</span><span class="insight-score" style="color:${scCol(rnsc)}">${scStr(rnsc)}</span></div>`;
+
+    panel.style.display='block'; setTimeout(()=>panel.classList.add('visible'),50);
+  }
+
+  function drawProsodyCanvas(pa){
+    const canvas=document.getElementById('prosody-canvas');
+    const env=pa.rms_envelope||[];
+    if(!env.length){canvas.style.display='none';return;}
+    canvas.style.display='block';
+    const dpr=window.devicePixelRatio||1; const W=canvas.clientWidth; const H=canvas.clientHeight||80;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    const PAD_L=4,PAD_R=4,PAD_T=4,PAD_B=4;
+    const cW=W-PAD_L-PAD_R; const cH=H-PAD_T-PAD_B;
+    const maxVal=Math.max(...env)||1;
+    const xOf=i=>PAD_L+(i/(env.length-1))*cW;
+    const yOf=v=>PAD_T+cH-(v/maxVal)*cH;
+    const grad=ctx.createLinearGradient(0,PAD_T,0,PAD_T+cH);
+    grad.addColorStop(0,'rgba(180,83,9,0.35)'); grad.addColorStop(1,'rgba(180,83,9,0.02)');
+    ctx.beginPath(); ctx.moveTo(xOf(0),PAD_T+cH);
+    env.forEach((v,i)=>ctx.lineTo(xOf(i),yOf(v)));
+    ctx.lineTo(xOf(env.length-1),PAD_T+cH); ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+    ctx.beginPath();
+    env.forEach((v,i)=>{i===0?ctx.moveTo(xOf(i),yOf(v)):ctx.lineTo(xOf(i),yOf(v));});
+    ctx.strokeStyle='#b45309'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  function renderAgreementIndicator(d){
+    const container=document.getElementById('agreement-indicator');
+    const modelDefs=[{key:'aasist3',label:'AASIST3'},{key:'wav2vec2',label:'WAV2VEC2'},{key:'rawnet2',label:'RAWNET2'}];
+    const pills=modelDefs.map(({key,label})=>{
+      const m=d.models[key]; if(!m.available)return{label,verdict:null,score:null};
+      const sc=m.aggregate_spoof_prob; return{label,verdict:sc>=50?'FAKE':'REAL',score:sc};
+    });
+    const available=pills.filter(p=>p.verdict!==null);
+    const fakeCount=available.filter(p=>p.verdict==='FAKE').length;
+    const realCount=available.length-fakeCount;
+    let finalVerdict,finalColor;
+    if(fakeCount===available.length){finalVerdict='ALL AGREE\nFAKE';finalColor='var(--high)';}
+    else if(realCount===available.length){finalVerdict='ALL AGREE\nREAL';finalColor='var(--low)';}
+    else if(fakeCount>realCount){finalVerdict='MAJORITY\nFAKE';finalColor='var(--medium)';}
+    else{finalVerdict='MAJORITY\nREAL';finalColor='var(--medium)';}
+
+    let html='<div class="agree-header"><span>AGREEMENT</span></div><div class="agree-models">';
+    pills.forEach(({label,verdict,score})=>{
+      const col=verdict===null?'var(--muted)':verdict==='FAKE'?'var(--high)':'var(--low)';
+      const scoreStr=score!=null?score.toFixed(1)+'% spoof':'—';
+      html+=`<div class="agree-pill"><div class="agree-pill-model">${label}</div><div class="agree-pill-verdict" style="color:${col}">${verdict||'N/A'}</div><div class="agree-pill-score">${scoreStr}</div></div>`;
+    });
+    html+='</div>';
+    html+=`<div class="agree-final"><div class="agree-final-label">VERDICT</div><div class="agree-final-verdict" style="color:${finalColor}">${finalVerdict.replace('\n','<br>')}</div><div class="agree-final-count">${fakeCount}F · ${realCount}R of ${available.length}</div></div>`;
+    container.innerHTML=html;
   }
 </script>
 </body>
