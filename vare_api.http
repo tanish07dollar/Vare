@@ -1,0 +1,212 @@
+# ============================================================
+# VARE — Voice Authenticity Risk Engine
+# API Integration Reference
+# ============================================================
+# Tool     : VS Code REST Client extension (humao.rest-client)
+# Install  : Extensions → search "REST Client" → Install
+# Usage    : Click "Send Request" above any ### block
+#
+# Base URL : Change @baseUrl below to match your deployment
+# Local    : http://127.0.0.1:8001
+# ============================================================
+
+@baseUrl = http://127.0.0.1:8001
+
+# ============================================================
+# ENDPOINT 1 — Health Check
+# Use this to verify the server is running and all models
+# are loaded before sending audio for analysis.
+# ============================================================
+
+### Health Check
+GET {{baseUrl}}/health
+Accept: application/json
+
+# Response:
+# HTTP/1.1 200 OK
+#
+# {
+#   "device": "cpu",
+#   "models_loaded": {
+#     "aasist3": true,
+#     "wav2vec2": true,
+#     "rawnet2": true
+#   }
+# }
+#
+# Integration note:
+#   Check all three values are true before sending audio.
+#   If any model is false, results will still be returned
+#   but ensemble accuracy will be lower.
+
+
+# ============================================================
+# ENDPOINT 2 — Analyze Audio
+#
+# Method  : POST /analyze
+# Body    : multipart/form-data, field name = "file"
+# Formats : .wav  .mp3  .flac  .ogg  .m4a  .webm
+# Min len : 2 seconds
+# Max len : no limit (auto-segmented into 4s windows)
+#
+# Change the file path on the line starting with "<" below.
+# ============================================================
+
+### Analyze Audio
+POST {{baseUrl}}/analyze
+Content-Type: multipart/form-data; boundary=VareBoundary
+
+--VareBoundary
+Content-Disposition: form-data; name="file"; filename="audio.wav"
+Content-Type: audio/wav
+
+< C:/path/to/your/audio.wav
+--VareBoundary--
+
+
+# ============================================================
+# RESPONSE SCHEMA
+# ============================================================
+#
+# {
+#   "status":           "ok" | "error",
+#   "filename":         string,
+#   "duration_sec":     float,
+#   "n_segments":       int,          // number of 4s windows analysed
+#   "ensemble_score":   float,        // 0–100, PRIMARY field for integration
+#   "risk_level":       "LOW" | "MEDIUM" | "HIGH",
+#   "risk_color":       "#22c55e" | "#f59e0b" | "#ef4444",
+#   "model_confidence": float,        // 0–1, agreement between models
+#   "models": {
+#     "aasist3": {
+#       "available":            bool,
+#       "error":                string | null,
+#       "aggregate_spoof_prob": float | null,   // 0–100
+#       "verdict":              "AI Generated" | "Genuine" | null,
+#       "segment_scores":       float[]         // per 4s window
+#     },
+#     "wav2vec2":  { ...same fields... },
+#     "rawnet2":   { ...same fields... }
+#   }
+# }
+
+
+# ============================================================
+# EXAMPLE RESPONSE — AI Generated audio (HIGH risk)
+# ============================================================
+#
+# {
+#   "status": "ok",
+#   "filename": "sample.wav",
+#   "duration_sec": 8.2,
+#   "n_segments": 2,
+#   "ensemble_score": 73.4,
+#   "risk_level": "HIGH",
+#   "risk_color": "#ef4444",
+#   "model_confidence": 0.812,
+#   "models": {
+#     "aasist3": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 68.1,
+#       "verdict": "AI Generated",
+#       "segment_scores": [65.2, 71.0]
+#     },
+#     "wav2vec2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 76.5,
+#       "verdict": "AI Generated",
+#       "segment_scores": [74.1, 78.9]
+#     },
+#     "rawnet2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 71.2,
+#       "verdict": "AI Generated",
+#       "segment_scores": [69.8, 72.6]
+#     }
+#   }
+# }
+
+
+# ============================================================
+# EXAMPLE RESPONSE — Genuine human audio (LOW risk)
+# ============================================================
+#
+# {
+#   "status": "ok",
+#   "filename": "sample.wav",
+#   "duration_sec": 5.1,
+#   "n_segments": 1,
+#   "ensemble_score": 18.3,
+#   "risk_level": "LOW",
+#   "risk_color": "#22c55e",
+#   "model_confidence": 0.941,
+#   "models": {
+#     "aasist3": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 21.0,
+#       "verdict": "Genuine",
+#       "segment_scores": [21.0]
+#     },
+#     "wav2vec2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 16.4,
+#       "verdict": "Genuine",
+#       "segment_scores": [16.4]
+#     },
+#     "rawnet2": {
+#       "available": true,
+#       "error": null,
+#       "aggregate_spoof_prob": 17.5,
+#       "verdict": "Genuine",
+#       "segment_scores": [17.5]
+#     }
+#   }
+# }
+
+
+# ============================================================
+# EXAMPLE RESPONSE — Error (invalid file / server error)
+# ============================================================
+#
+# HTTP/1.1 500 Internal Server Error
+#
+# {
+#   "status": "error",
+#   "message": "Error description here"
+# }
+
+
+# ============================================================
+# INTEGRATION QUICK REFERENCE
+# ============================================================
+#
+# PRIMARY field   → ensemble_score (0–100)
+#
+# Risk thresholds:
+#   0  – 30   LOW     → Genuine / passes cleanly
+#   31 – 60   MEDIUM  → Suspicious, flag for manual review
+#   61 – 100  HIGH    → Strong AI / synthetic indicators
+#
+# Per-model verdict:
+#   Each model independently returns "AI Generated" or "Genuine"
+#   based on its own score >= 50 threshold.
+#
+# Ensemble weights (when all 3 models available):
+#   AASIST3   20%  — graph attention, spectro-temporal features
+#   wav2vec2  45%  — transformer, self-supervised speech features
+#   RawNet2   35%  — raw waveform CNN+GRU
+#
+# model_confidence:
+#   1.0  → all models agree completely
+#   0.0  → models disagree completely
+#   Use this to decide whether to trust the result or flag for review.
+#
+# Segment scores:
+#   Audio > 4s is split into overlapping 4s windows.
+#   segment_scores contains per-window probabilities.
+#   Useful for detecting partial spoofing in long recordings.

@@ -1,0 +1,26 @@
+# VARE — Voice Authenticity Risk Engine
+# Runtime dependencies for app/app.py (CPU, no training)
+# Setup: see setup_env.bat
+
+# Core ML
+torch==2.6.0
+torchaudio==2.6.0
+numpy==1.26.4
+
+# HuggingFace
+transformers>=4.41.0
+accelerate
+safetensors
+huggingface-hub
+
+# Audio
+soundfile
+scipy
+
+# Web server
+fastapi
+uvicorn[standard]
+
+# Utilities
+tqdm
+PyYAML

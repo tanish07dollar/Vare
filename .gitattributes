@@ -1,0 +1,9 @@
+# Mark binary model files — prevents git CRLF conversion from corrupting them
+*.pth        binary
+*.pt         binary
+*.bin        binary
+*.safetensors binary
+*.onnx       binary
+*.pkl        binary
+*.npy        binary
+*.npz        binary
