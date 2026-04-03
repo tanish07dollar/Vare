@@ -34,11 +34,13 @@ import subprocess
 packages = [
     "transformers>=4.41.0",
     "accelerate",
-    "zenodo_get",        # for downloading WaveFake from Zenodo
     "kokoro>=0.9.2",     # neural TTS for fake generation
     "edge-tts",          # Microsoft Azure TTS for fake generation
     "soundfile",
     "scipy",
+    "bark",              # Suno Bark TTS for fake generation
+    "TTS",               # Coqui TTS for fake generation
+    "nest_asyncio",      # required for edge-tts in Kaggle notebooks
 ]
 
 for pkg in packages:
@@ -84,63 +86,62 @@ sys.path.insert(0, f"{vare_dir}/models/aasist3")
 print(f"VARE path added: {vare_dir}")
 
 # =============================================================================
-# CELL 4 — Download WaveFake (Zenodo, no login needed)
+# CELL 4 — Download Datasets
 # =============================================================================
-# WaveFake: 8.8 GB, 6 GAN vocoders, LJSpeech + JSUT real speech
-# Zenodo DOI: 10.5281/zenodo.5642795
-# Runtime: ~15-20 minutes on Kaggle
+# Part A: LibriSpeech train-clean-100 (~6.3 GB) — real speech
+# Part B: Kaggle input datasets (ElevenLabs + Resemble AI) — already mounted
+#
+# SETUP REQUIRED before running:
+#   In Kaggle notebook → Add Data (right panel) → search and add:
+#     1. "vare-elevenlabs-fake-audio"  (your private dataset)
+#     2. "vare-resemble-fake-audio"    (your private dataset)
+#   These will mount at:
+#     /kaggle/input/vare-elevenlabs-fake-audio/
+#     /kaggle/input/vare-resemble-fake-audio/
+#
+# Runtime: ~10-15 minutes total
 
-import subprocess
+import torchaudio
 from pathlib import Path
 
-WAVEFAKE_DIR = Path("/kaggle/working/wavefake")
-WAVEFAKE_DIR.mkdir(exist_ok=True)
+LIBRISPEECH_DIR = Path("/kaggle/working/librispeech")
+LIBRISPEECH_DIR.mkdir(exist_ok=True)
 
-# Check if already downloaded (resumable)
-existing = list(WAVEFAKE_DIR.glob("*.zip")) + list(WAVEFAKE_DIR.glob("*.tar.gz"))
-if not existing:
-    print("Downloading WaveFake from Zenodo (~8.8 GB)...")
-    result = subprocess.run(
-        ["zenodo_get", "5642795", "-o", str(WAVEFAKE_DIR)],
-        capture_output=True, text=True
+# ---- Part A: LibriSpeech train-clean-100 ----
+print("=" * 50)
+print("Part A: LibriSpeech train-clean-100 (~6.3 GB, ~28,000 clips)")
+ls_check = list(LIBRISPEECH_DIR.rglob("*.flac"))
+if len(ls_check) < 1000:
+    print("Downloading LibriSpeech train-clean-100...")
+    torchaudio.datasets.LIBRISPEECH(
+        root=str(LIBRISPEECH_DIR),
+        url="train-clean-100",
+        download=True
     )
-    print(result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout)
-    if result.returncode != 0:
-        print("ERROR:", result.stderr[-1000:])
 else:
-    print(f"Files already present: {[f.name for f in existing]}")
+    print(f"Already downloaded: {len(ls_check)} flac files found")
 
-# Extract all zip/tar files
-import zipfile, tarfile
+ls_all = list(LIBRISPEECH_DIR.rglob("*.flac"))
+print(f"Total LibriSpeech clips: {len(ls_all)}")
 
-for archive in sorted(WAVEFAKE_DIR.glob("*.zip")):
-    dest = WAVEFAKE_DIR / archive.stem
-    if not dest.exists():
-        print(f"Extracting {archive.name}...")
-        with zipfile.ZipFile(archive, "r") as z:
-            z.extractall(WAVEFAKE_DIR)
+# ---- Part B: Kaggle input datasets ----
+print("\n" + "=" * 50)
+print("Part B: Kaggle input datasets")
+
+ELEVENLABS_DIR = Path("/kaggle/input/vare-elevenlabs-fake-audio")
+RESEMBLE_DIR   = Path("/kaggle/input/vare-resemble-fake-audio")
+
+for name, d in [("ElevenLabs", ELEVENLABS_DIR), ("Resemble AI", RESEMBLE_DIR)]:
+    if d.exists():
+        wavs = list(d.rglob("*.wav"))
+        print(f"  {name:<15} {len(wavs)} wav files  ✓  ({d})")
     else:
-        print(f"Already extracted: {archive.name}")
-
-for archive in sorted(WAVEFAKE_DIR.glob("*.tar.gz")):
-    dest = WAVEFAKE_DIR / archive.name.replace(".tar.gz", "")
-    if not dest.exists():
-        print(f"Extracting {archive.name}...")
-        with tarfile.open(archive, "r:gz") as t:
-            t.extractall(WAVEFAKE_DIR)
-
-# Verify structure
-print("\n--- WaveFake directory contents ---")
-for item in sorted(WAVEFAKE_DIR.iterdir()):
-    if item.is_dir():
-        wav_count = len(list(item.rglob("*.wav")))
-        print(f"  {item.name:<40} {wav_count:>6} wav files")
+        print(f"  {name:<15} NOT FOUND — add dataset in Kaggle → Add Data → '{d.name}'")
 
 # =============================================================================
-# CELL 5 — Generate Additional Fake Audio (Kokoro + edge-tts)
+# CELL 5 — Generate Additional Fake Audio (Kokoro + edge-tts + Bark + Coqui)
 # =============================================================================
-# Uses LJSpeech transcripts from WaveFake as text input.
-# Generates ~2000 fake clips across 2 synthesis systems.
+# Generates fake clips using built-in sentences across 4 synthesis systems.
 # Runtime: ~30-45 minutes on T4 GPU
 
 import asyncio, soundfile as sf, numpy as np
@@ -149,31 +150,24 @@ from pathlib import Path
 GEN_DIR    = Path("/kaggle/working/generated_fakes")
 N_GENERATE = 1000   # clips per TTS system (adjust if running out of time)
 
-# --- Load LJSpeech transcripts (included in WaveFake download) ---
-lj_meta = WAVEFAKE_DIR / "LJSpeech-1.1" / "metadata.csv"
-if not lj_meta.exists():
-    # Search for it
-    candidates = list(WAVEFAKE_DIR.rglob("metadata.csv"))
-    lj_meta = candidates[0] if candidates else None
-
-transcripts = []
-if lj_meta and lj_meta.exists():
-    with open(lj_meta, encoding="utf-8") as f:
-        for line in f:
-            parts = line.strip().split("|")
-            if len(parts) >= 2 and len(parts[1]) > 10:
-                transcripts.append(parts[1].strip())
-    print(f"Loaded {len(transcripts)} LJSpeech transcripts")
-else:
-    # Fallback: use built-in sentences
-    transcripts = [
-        "The quick brown fox jumps over the lazy dog.",
-        "She sells seashells by the seashore.",
-        "How much wood would a woodchuck chuck?",
-        "Peter Piper picked a peck of pickled peppers.",
-        "To be or not to be, that is the question.",
-    ] * 300
-    print(f"Using {len(transcripts)} fallback transcripts")
+transcripts = [
+    "The quick brown fox jumps over the lazy dog.",
+    "She sells seashells by the seashore.",
+    "How much wood would a woodchuck chuck if a woodchuck could chuck wood?",
+    "Peter Piper picked a peck of pickled peppers.",
+    "To be or not to be, that is the question.",
+    "I wandered lonely as a cloud that floats on high over vales and hills.",
+    "All that glitters is not gold, often have you heard that told.",
+    "It was the best of times, it was the worst of times.",
+    "Call me Ishmael. Some years ago I thought I would sail about a little.",
+    "It is a truth universally acknowledged that a single man needs a fortune.",
+    "In the beginning God created the heavens and the earth.",
+    "The only thing we have to fear is fear itself.",
+    "Ask not what your country can do for you, ask what you can do for your country.",
+    "That's one small step for man, one giant leap for mankind.",
+    "To infinity and beyond, the stars await those who dare to dream.",
+] * 70   # 1050 sentences total — enough for all systems
+print(f"Using {len(transcripts)} built-in transcripts")
 
 transcripts = transcripts[:N_GENERATE]
 
@@ -272,6 +266,77 @@ else:
     except Exception as e:
         print(f"edge-tts failed: {e} — skipping")
 
+# ---- Part C: Bark ----
+print("\n--- Generating with Bark ---")
+bark_dir = GEN_DIR / "bark"
+bark_dir.mkdir(parents=True, exist_ok=True)
+
+N_BARK = 300
+already_done_b = len(list(bark_dir.glob("*.wav")))
+if already_done_b >= N_BARK:
+    print(f"Bark: {already_done_b} files already generated, skipping.")
+else:
+    try:
+        from bark import generate_audio, SAMPLE_RATE as BARK_SR
+        from bark.preload_models import preload_models
+        import soundfile as sf
+
+        preload_models()
+
+        bark_voices = [
+            "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_2",
+            "v2/en_speaker_3", "v2/en_speaker_6", "v2/en_speaker_9",
+        ]
+
+        generated_b = already_done_b
+        for i, text in enumerate(transcripts[already_done_b:N_BARK], start=already_done_b):
+            voice = bark_voices[i % len(bark_voices)]
+            try:
+                audio_array = generate_audio(text, history_prompt=voice)
+                out_path = bark_dir / f"bark_{i:04d}.wav"
+                sf.write(str(out_path), audio_array, BARK_SR)
+                generated_b += 1
+            except Exception:
+                continue
+            if (i + 1) % 50 == 0:
+                print(f"  Bark: {generated_b}/{N_BARK}", end="\r")
+
+        print(f"\nBark done: {generated_b} files")
+    except Exception as e:
+        print(f"Bark failed: {e} — skipping")
+
+
+# ---- Part D: Coqui TTS ----
+print("\n--- Generating with Coqui TTS ---")
+coqui_dir = GEN_DIR / "coqui"
+coqui_dir.mkdir(parents=True, exist_ok=True)
+
+N_COQUI = 300
+already_done_c = len(list(coqui_dir.glob("*.wav")))
+if already_done_c >= N_COQUI:
+    print(f"Coqui TTS: {already_done_c} files already generated, skipping.")
+else:
+    try:
+        from TTS.api import TTS as CoquiTTS
+
+        tts_model = CoquiTTS("tts_models/en/ljspeech/tacotron2-DDC", gpu=True)
+
+        generated_c = already_done_c
+        for i, text in enumerate(transcripts[already_done_c:N_COQUI], start=already_done_c):
+            out_path = coqui_dir / f"coqui_{i:04d}.wav"
+            try:
+                tts_model.tts_to_file(text=text, file_path=str(out_path))
+                generated_c += 1
+            except Exception:
+                continue
+            if (i + 1) % 50 == 0:
+                print(f"  Coqui: {generated_c}/{N_COQUI}", end="\r")
+
+        print(f"\nCoqui TTS done: {generated_c} files")
+    except Exception as e:
+        print(f"Coqui TTS failed: {e} — skipping")
+
+
 # Summary
 print("\n--- Generated fake audio summary ---")
 for d in sorted(GEN_DIR.iterdir()):
@@ -282,7 +347,9 @@ for d in sorted(GEN_DIR.iterdir()):
 # =============================================================================
 # CELL 6 — Build Unified Dataset Manifest
 # =============================================================================
-# Scans WaveFake + generated fakes, assigns labels, creates balanced split.
+# Collects all sources: LibriSpeech, ElevenLabs, Resemble AI,
+# Kokoro, edge-tts, Bark, Coqui TTS.
+# Assigns labels (0=real, 1=fake), creates 70/15/15 train/val/test split.
 # Output: /kaggle/working/dataset.csv
 
 import csv, random
@@ -290,46 +357,39 @@ from pathlib import Path
 
 random.seed(42)
 
-WAVEFAKE_DIR = Path("/kaggle/working/wavefake")
-GEN_DIR      = Path("/kaggle/working/generated_fakes")
-MANIFEST     = Path("/kaggle/working/dataset.csv")
+LIBRISPEECH_DIR = Path("/kaggle/working/librispeech")
+GEN_DIR         = Path("/kaggle/working/generated_fakes")
+ELEVENLABS_DIR  = Path("/kaggle/input/vare-elevenlabs-fake-audio")
+RESEMBLE_DIR    = Path("/kaggle/input/vare-resemble-fake-audio")
+MANIFEST        = Path("/kaggle/working/dataset.csv")
 
-MAX_PER_SOURCE = 700   # cap samples per synthesis system (prevents any one system dominating)
-MAX_REAL       = 5000  # total real samples
+MAX_PER_SOURCE = 700   # cap per synthesis system — prevents any one system dominating
+MAX_REAL       = 2000  # total real samples
 
-# ---- Collect REAL audio from WaveFake ----
-real_sources = [
-    ("LJSpeech-1.1", WAVEFAKE_DIR / "LJSpeech-1.1"),
-    ("jsut",         WAVEFAKE_DIR / "jsut_basic5000"),
-]
+# ---- Collect REAL audio ----
+print("=" * 55)
+print("Collecting REAL audio...")
 
 real_files = []
-for source_name, source_dir in real_sources:
-    if source_dir.exists():
-        wavs = list(source_dir.rglob("*.wav"))
-        random.shuffle(wavs)
-        real_files.extend([(str(p), 0, source_name) for p in wavs])
 
-random.shuffle(real_files)
-real_files = real_files[:MAX_REAL]
-print(f"Real samples collected: {len(real_files)}")
+# LibriSpeech train-clean-100
+if LIBRISPEECH_DIR.exists():
+    wavs = list(LIBRISPEECH_DIR.rglob("*.flac"))
+    random.shuffle(wavs)
+    selected = wavs[:MAX_REAL]
+    real_files.extend([(str(p), 0, "librispeech") for p in selected])
+    print(f"  LibriSpeech train-clean-100              {len(selected):>6} samples")
+else:
+    print("  LibriSpeech NOT FOUND — check Cell 4 ran successfully")
 
-# ---- Collect FAKE audio from WaveFake ----
-# Folder names follow pattern: ljspeech_<vocoder> or jsut_<vocoder>
-fake_systems_wf = [
-    d for d in WAVEFAKE_DIR.iterdir()
-    if d.is_dir() and ("ljspeech_" in d.name or "jsut_" in d.name)
-]
+print(f"\nReal samples total: {len(real_files)}")
+
+# ---- Collect FAKE audio ----
+print("\nCollecting FAKE audio...")
 
 fake_files = []
-for system_dir in sorted(fake_systems_wf):
-    wavs = list(system_dir.rglob("*.wav"))
-    random.shuffle(wavs)
-    selected = wavs[:MAX_PER_SOURCE]
-    fake_files.extend([(str(p), 1, system_dir.name) for p in selected])
-    print(f"  {system_dir.name:<40} {len(selected)} samples")
 
-# ---- Collect FAKE audio from generated sources ----
+# Generated fakes (Kokoro, edge-tts, Bark, Coqui)
 if GEN_DIR.exists():
     for gen_subdir in sorted(GEN_DIR.iterdir()):
         if gen_subdir.is_dir():
@@ -337,7 +397,29 @@ if GEN_DIR.exists():
             random.shuffle(wavs)
             selected = wavs[:MAX_PER_SOURCE]
             fake_files.extend([(str(p), 1, gen_subdir.name) for p in selected])
-            print(f"  {gen_subdir.name:<40} {len(selected)} samples")
+            print(f"  {gen_subdir.name:<40} {len(selected):>6} samples")
+else:
+    print("  Generated fakes NOT FOUND — check Cell 5 ran successfully")
+
+# ElevenLabs Kaggle dataset
+if ELEVENLABS_DIR.exists():
+    wavs = list(ELEVENLABS_DIR.rglob("*.wav"))
+    random.shuffle(wavs)
+    selected = wavs[:MAX_PER_SOURCE]
+    fake_files.extend([(str(p), 1, "elevenlabs") for p in selected])
+    print(f"  elevenlabs                               {len(selected):>6} samples")
+else:
+    print(f"  elevenlabs — SKIPPED (dataset not mounted)")
+
+# Resemble AI Kaggle dataset
+if RESEMBLE_DIR.exists():
+    wavs = list(RESEMBLE_DIR.rglob("*.wav"))
+    random.shuffle(wavs)
+    selected = wavs[:MAX_PER_SOURCE]
+    fake_files.extend([(str(p), 1, "resemble") for p in selected])
+    print(f"  resemble                                 {len(selected):>6} samples")
+else:
+    print(f"  resemble   — SKIPPED (dataset not mounted)")
 
 print(f"\nFake samples collected: {len(fake_files)}")
 
@@ -495,6 +577,76 @@ def log(msg, path):
 print("Utilities ready.")
 
 # =============================================================================
+# CELL 7B — Dataset Audit (run before training)
+# =============================================================================
+# Reads the manifest and prints exact counts per source, per split, per label.
+
+import csv
+from pathlib import Path
+from collections import defaultdict
+
+MANIFEST = Path("/kaggle/working/dataset.csv")
+
+# source → split → label → count
+counts = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+missing = 0
+
+with open(MANIFEST) as f:
+    for row in csv.DictReader(f):
+        exists = Path(row["path"]).exists()
+        if not exists:
+            missing += 1
+        counts[row["source"]][row["split"]][int(row["label"])] += 1
+
+# ── Per-source breakdown ──
+print("=" * 65)
+print(f"{'SOURCE':<28} {'LABEL':<8} {'TRAIN':>7} {'VAL':>7} {'TEST':>7} {'TOTAL':>7}")
+print("=" * 65)
+
+total_real = total_fake = 0
+for source in sorted(counts):
+    for label in [0, 1]:
+        label_str = "real" if label == 0 else "fake"
+        tr = counts[source]["train"][label]
+        va = counts[source]["val"][label]
+        te = counts[source]["test"][label]
+        tot = tr + va + te
+        if tot == 0:
+            continue
+        print(f"  {source:<26} {label_str:<8} {tr:>7} {va:>7} {te:>7} {tot:>7}")
+        if label == 0:
+            total_real += tot
+        else:
+            total_fake += tot
+
+# ── Split totals ──
+split_totals = defaultdict(lambda: defaultdict(int))
+for source in counts:
+    for split in counts[source]:
+        for label in counts[source][split]:
+            split_totals[split][label] += counts[source][split][label]
+
+print("=" * 65)
+print(f"\n{'SPLIT':<10} {'REAL':>8} {'FAKE':>8} {'TOTAL':>8}")
+print("-" * 36)
+grand_total = 0
+for split in ["train", "val", "test"]:
+    r = split_totals[split][0]
+    fk = split_totals[split][1]
+    print(f"  {split:<8} {r:>8} {fk:>8} {r+fk:>8}")
+    grand_total += r + fk
+
+print("-" * 36)
+print(f"  {'TOTAL':<8} {total_real:>8} {total_fake:>8} {grand_total:>8}")
+print(f"\nClass balance  — Real: {total_real} ({100*total_real/grand_total:.1f}%)  "
+      f"Fake: {total_fake} ({100*total_fake/grand_total:.1f}%)")
+if missing:
+    print(f"\n⚠  {missing} file(s) in manifest not found on disk — they will be skipped during training.")
+else:
+    print("\n✓  All files in manifest exist on disk.")
+print("=" * 65)
+
+# =============================================================================
 # CELL 8 — Train RawNet2
 # =============================================================================
 # Expected runtime: ~3-4 hours on T4
@@ -533,11 +685,48 @@ CONFIG = {
     "nb_classes":   2,
 }
 
-BATCH  = 24
-EPOCHS = 30
-LR     = 1e-3
+BATCH         = 24
+EPOCHS        = 30
+LR            = 1e-3
+EARLY_STOP    = 6    # stop if val_acc doesn't improve for this many epochs
 
 def L(msg): log(msg, LOG)
+
+def compute_eer(labels_list, scores_list):
+    """Equal Error Rate — lower is better (0 = perfect)."""
+    from scipy.optimize import brentq
+    from scipy.interpolate import interp1d
+    from sklearn.metrics import roc_curve
+    fpr, tpr, _ = roc_curve(labels_list, scores_list, pos_label=1)
+    eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
+    return eer
+
+def evaluate_with_eer(model, loader, forward_fn):
+    """Validation loop that also computes EER."""
+    model.eval()
+    correct = total = tp = fp = tn = fn = 0
+    all_labels, all_scores = [], []
+    with torch.no_grad():
+        for audio, labels in loader:
+            audio, labels = audio.to(device), labels.to(device)
+            logits  = forward_fn(model, audio)
+            probs   = torch.softmax(logits, dim=1)[:, 1]
+            preds   = logits.argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total   += labels.size(0)
+            tp += ((preds == 1) & (labels == 1)).sum().item()
+            fp += ((preds == 1) & (labels == 0)).sum().item()
+            fn += ((preds == 0) & (labels == 1)).sum().item()
+            all_labels.extend(labels.cpu().tolist())
+            all_scores.extend(probs.cpu().tolist())
+    acc       = correct / total
+    recall    = tp / (tp + fn + 1e-9)
+    precision = tp / (tp + fp + 1e-9)
+    try:
+        eer = compute_eer(all_labels, all_scores)
+    except Exception:
+        eer = float("nan")
+    return acc, recall, precision, eer
 
 L("=== RawNet2 Training ===")
 print("Loading dataset...")
@@ -548,15 +737,19 @@ train_loader, val_loader = make_loaders(train_f, train_l, val_f, val_l, BATCH, n
 model     = RawNet2(CONFIG).to(device)
 L(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=5)
+# Label smoothing 0.1 prevents overconfident predictions on seen sources
+criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
+# Stronger weight decay (1e-3 vs 1e-4) to penalise memorisation
+optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-3)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=4)
 
-best_acc = 0.0
+best_acc      = 0.0
+no_improve    = 0
 
 def rn_forward(m, x): return m(x)[1]
 
 L(f"Training for {EPOCHS} epochs | batch={BATCH} | device={device}")
+L(f"Label smoothing: 0.1 | Weight decay: 1e-3 | Early stop patience: {EARLY_STOP}")
 L("=" * 60)
 
 for epoch in range(1, EPOCHS + 1):
@@ -577,20 +770,27 @@ for epoch in range(1, EPOCHS + 1):
         if i % 100 == 0:
             print(f"  Ep {epoch:02d} | {i:4d}/{len(train_loader)} | loss {loss.item():.4f}", end="\r")
 
-    val_acc, val_recall, val_prec = evaluate(model, val_loader, rn_forward)
+    val_acc, val_recall, val_prec, val_eer = evaluate_with_eer(model, val_loader, rn_forward)
     scheduler.step(val_acc)
 
     msg = (f"Ep {epoch:02d}/{EPOCHS} | "
            f"loss {t_loss/len(train_loader):.4f} | "
            f"train_acc {t_correct/t_total:.3f} | "
-           f"val_acc {val_acc:.3f} | recall {val_recall:.3f} | prec {val_prec:.3f}")
+           f"val_acc {val_acc:.3f} | recall {val_recall:.3f} | "
+           f"prec {val_prec:.3f} | EER {val_eer:.4f}")
     L(msg)
 
     if val_acc > best_acc:
-        best_acc = val_acc
+        best_acc   = val_acc
+        no_improve = 0
         torch.save({"epoch": epoch, "state": model.state_dict(),
-                    "config": CONFIG, "val_acc": val_acc}, CKPT)
-        L(f"  ✓ Best saved  val_acc={val_acc:.3f}")
+                    "config": CONFIG, "val_acc": val_acc, "eer": val_eer}, CKPT)
+        L(f"  ✓ Best saved  val_acc={val_acc:.3f}  EER={val_eer:.4f}")
+    else:
+        no_improve += 1
+        if no_improve >= EARLY_STOP:
+            L(f"  Early stopping triggered (no improvement for {EARLY_STOP} epochs)")
+            break
 
 L(f"\nRawNet2 done. Best val_acc: {best_acc:.3f} | Checkpoint: {CKPT}")
 
